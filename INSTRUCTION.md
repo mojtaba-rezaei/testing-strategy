@@ -1,4 +1,4 @@
-# INSTRUCTION.md  
+# INSTRUCTION.md
 ## Azure Integration Platform – Automation Testing Standardization Prompt
 
 ### Purpose
@@ -6,7 +6,7 @@ This instruction file contains a **complete, reusable prompt** intended for use 
 
 The goal is to help **plan, design, and evolve a company-wide automation testing standard** for an **integration company using the Azure Integration Platform**.
 
-⚠️ **Important Principle**  
+⚠️ **Important Principle**
 The strategy must be designed with a **final enterprise-grade goal in mind**, but it must be **developed and adopted incrementally**, starting with **small, safe, low-cost steps** and growing over time.
 
 The resulting output should be suitable for:
@@ -53,7 +53,7 @@ The strategy must:
 - Be CI/CD-driven
 - Balance quality, speed, cost, and maintainability
 
-⚠️ **However:**  
+⚠️ **However:**
 You must **not assume full maturity from day one**.
 
 ---

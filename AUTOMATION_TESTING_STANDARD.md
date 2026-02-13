@@ -13,7 +13,6 @@ This file is the single source of truth for automation testing standards across 
   - Fast, isolated, deterministic tests (< 100ms per test)
   - No external dependencies (mocks/stubs only)
   - Minimum code coverage: 80% for business logic
-  - All public methods and critical paths must be tested
   - Edge cases, error handling, and validation logic must be covered
 - **Intentionally Deferred:**
   - Integration, contract, performance, and system tests
@@ -23,10 +22,10 @@ This file is the single source of truth for automation testing standards across 
 
 ### Step 2 — Integration Testing (Mature Phase)
 - **Required:**
-  - Integration tests between Azure components (Function → Service Bus, Logic App → API, etc.)
+  - Integration tests between Azure components (Function → Service Bus, Logic App → API, etc. These can be mocked in test, meaning the actual connections can be tested in portal.)
   - Component interaction validation (triggers, bindings, connectors)
   - Contract tests (API, schema, message format validation using JSON Schema, OpenAPI)
-  - Regression tests for critical integration paths
+  - Regression tests for critical integration parts
   - Smoke tests for deployment validation
   - Performance tests for key integration scenarios (baseline metrics)
   - Test data setup/teardown automation
@@ -50,16 +49,17 @@ Our testing strategy follows the **Test Pyramid** pattern, which is a foundation
 #### The 60-30-10 Distribution
 
 ```
-                    /\
-                   /  \
-                  / E2E\ 10%
-                 /______\
-                /        \
-               /Integration\ 30%
-              /_____________\
-             /               \
-            /   Unit Tests    \ 60%
-           /__________________\
+                     /\
+                    /  \
+                   /    \
+                  / E2E  \ 10%
+                 /_______ \
+                /          \
+               /Integration \ 30%
+              /_____________ \
+             /                \
+            /   Unit Tests     \ 60%
+           /___________________ \
 ```
 
 **Test Distribution Breakdown:**
@@ -85,8 +85,8 @@ Our testing strategy follows the **Test Pyramid** pattern, which is a foundation
 - **Confidence:** Validate integration points, contracts, data flow
 - **Azure-Specific:** Test real Azure services (Service Bus, Storage, etc.)
 - **Balance:** More valuable than E2E, faster than E2E
-- **Cost:** Higher cost than unit tests (requires infrastructure)
-- **Scope:** Focus on critical integration paths, not every combination
+- **Cost:** Higher cost than unit tests (requires infrastructure, either actual Azure resources or local emulators/containers )
+- **Scope:** Mostly ocus on critical integration parts
 
 **10% E2E/Manual Tests (Top):**
 - **Business Value:** Validate complete user journeys
@@ -104,12 +104,10 @@ Our testing strategy follows the **Test Pyramid** pattern, which is a foundation
 - ✅ Write many small, focused unit tests for all business logic
 - ✅ Test error paths, edge cases, validation in unit tests
 - ✅ Write integration tests for all Azure service interactions
-- ✅ Focus E2E tests on critical business flows only
-- ✅ Automate unit and integration tests in CI/CD
+- ✅ Automate unit and integration (as much as possible) tests in CI/CD
 - ✅ Perform E2E tests manually in dedicated test environments
 
 **DON'T:**
-- ❌ Write E2E tests for everything (too slow, fragile, expensive)
 - ❌ Skip unit tests because you have integration tests
 - ❌ Test business logic only in integration tests
 - ❌ Write integration tests for things that can be unit tested
@@ -130,8 +128,8 @@ When creating tests for a new feature:
 | Role | Primary Focus | Test Types |
 |------|--------------|------------|
 | **Developers** | Write tests with code | Unit (60%) + Integration (30%) |
-| **QA Engineers** | Test strategy, quality gates | Integration (30%) + E2E (10%) |
-| **DevOps Engineers** | Pipeline automation, infrastructure | Integration test environments |
+| **QA Engineers (?, Developers?)** | Test strategy, quality gates | Integration (30%) + E2E (10%) |
+| **DevOps Engineers (?, Developers?)** | Pipeline automation, infrastructure | Integration test environments |
 
 ### Measuring Compliance with 60-30-10
 
@@ -147,55 +145,6 @@ Total Tests: 943
 Status: ✅ Compliant with 60-30-10 pyramid
 ```
 
-**Tools for Measurement:**
-- **dotnet test** with test categorization
-- **Azure DevOps Test Plans** for tracking
-- **SonarQube** for test metrics
-- **Custom reporting scripts** (calculate distribution)
-
-**Test Categorization (C# Example):**
-
-```csharp
-// Unit test - mark with [Trait]
-[Fact]
-[Trait("Category", "Unit")]
-public void ProcessOrder_WithValidInput_ReturnsSuccess() { }
-
-// Integration test - mark with [Trait]
-[Fact]
-[Trait("Category", "Integration")]
-public async Task ProcessOrder_EndToEnd_MessageProcessedSuccessfully() { }
-
-// E2E test - documented in test plan (manual)
-[TestCase("TC-001")]
-Manual Test: Complete order flow from UI → Processing → Confirmation
-```
-
-**Pipeline Reporting:**
-
-```yaml
-# Report test distribution in pipeline
-- task: PowerShell@2
-  displayName: 'Test Distribution Report'
-  inputs:
-    targetType: 'inline'
-    script: |
-      $unitTests = (dotnet test --filter "Category=Unit" --list-tests | Measure-Object).Count
-      $integrationTests = (dotnet test --filter "Category=Integration" --list-tests | Measure-Object).Count
-      $total = $unitTests + $integrationTests
-      
-      $unitPercent = [math]::Round(($unitTests / $total) * 100, 2)
-      $integrationPercent = [math]::Round(($integrationTests / $total) * 100, 2)
-      
-      Write-Host "Test Distribution:"
-      Write-Host "Unit Tests: $unitTests ($unitPercent%)"
-      Write-Host "Integration Tests: $integrationTests ($integrationPercent%)"
-      
-      if ($unitPercent -lt 55 -or $unitPercent -gt 70) {
-        Write-Warning "Unit test percentage outside recommended range (60% ± 10%)"
-      }
-```
-
 ### Anti-Patterns to Avoid
 
 | Anti-Pattern | Problem | Solution |
@@ -203,26 +152,29 @@ Manual Test: Complete order flow from UI → Processing → Confirmation
 | **Inverted Pyramid** | More E2E than unit tests | Refactor: move logic tests to unit level |
 | **Ice Cream Cone** | Mostly manual tests | Automate: add unit & integration tests |
 | **Hourglass** | Missing integration tests | Add: integration tests for service boundaries |
-| **100% Unit Tests** | No integration confidence | Add: integration tests for critical paths |
+| **100% Unit Tests** | No integration confidence | Add: integration tests for critical parts |
 
 ### Phase-Based Evolution
 
 **Phase 1: Build the Foundation (60% Unit Tests)**
+Integration tests and E2E tests will be done manually.
 - Focus: Establish unit testing culture
 - Target: 60% of all tests are unit tests
 - Duration: 2-3 months
 - Exit Criteria: Stable unit test suite, 80% code coverage
 
 **Phase 2: Add Integration Layer (30% Integration Tests)**
+E2E tests will be done manually.
 - Focus: Test Azure service interactions
 - Target: 30% of all tests are integration tests
 - Duration: 3-6 months
 - Exit Criteria: All integration points tested, contracts validated
 
-**Phase 3: Strategic E2E (10% Manual Tests)**
-- Focus: Manual testing of critical flows
-- Target: 10% effort on manual E2E testing
-- Duration: Ongoing
+**Phase 3, someday: Automated E2E tests (10% E2E Tests)**
+All tests should will be automated.
+- Focus: Automated testing of critical flows
+- Target: 10% effort on automated E2E testing
+- Duration: From the date forward
 - Exit Criteria: Test plans for all critical business flows
 
 ### Benefits of 60-30-10 Distribution
@@ -243,17 +195,21 @@ Manual Test: Complete order flow from UI → Processing → Confirmation
 ```mermaid
 graph TB
     subgraph Test Pyramid - 60/30/10 Distribution
-    E2E[E2E Tests - Manual<br/>10% - ~100 tests<br/>Slowest, Most Expensive<br/>Business Flows Only]
-    INT[Integration Tests<br/>30% - ~300 tests<br/>Medium Speed<br/>Azure Service Interactions]
-    UNIT[Unit Tests<br/>60% - ~600 tests<br/>Fast, Isolated<br/>Business Logic]
+
+    spacer[" "]:::hidden
+
+    UNIT[Unit Tests<br/>60% of tests<br/>Fast, Isolated<br/>Business Logic]
+    INT[Integration Tests<br/>30% of tests<br/>Medium Speed<br/>Azure Service Interactions]
+    E2E[E2E Tests - Manual<br/>10% of tests<br/>Slowest, Most Expensive<br/>Business Flows Only]
     end
-    
-    E2E --> INT
-    INT --> UNIT
-    
+
+    UNIT --> INT
+    INT --> E2E
+
     style E2E fill:#ff6b6b,stroke:#c92a2a,stroke-width:2px,color:#fff
     style INT fill:#4ecdc4,stroke:#0a9396,stroke-width:2px,color:#fff
     style UNIT fill:#95e1d3,stroke:#38a169,stroke-width:3px,color:#000
+    classDef hidden fill:none,stroke:none,color:none;
 ```
 
 ### Testing Strategy by Phase
@@ -263,21 +219,21 @@ graph LR
     subgraph Phase 1: Foundation - 2-3 months
     P1[Unit Tests Only<br/>60% Coverage<br/>Fast Feedback<br/>Low Cost]
     end
-    
+
     subgraph Phase 2: Maturity - 3-6 months
     P2[Unit + Integration<br/>90% Total Coverage<br/>Azure Services<br/>Contract Testing]
     end
-    
+
     subgraph Phase 3: Continuous
-    P3[Complete Strategy<br/>60/30/10 Distribution<br/>Manual E2E<br/>Full Automation]
+    P3[Complete Strategy<br/>60/30/10 Distribution<br/>Automated E2E<br/>Full Automation]
     end
-    
+
     P1 -->|Exit Criteria Met| P2
     P2 -->|Fully Adopted| P3
-    
-    style P1 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    style P2 fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    style P3 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+
+    style P1 fill:#000000,stroke:#1976d2,stroke-width:2px
+    style P2 fill:#000000,stroke:#7b1fa2,stroke-width:2px
+    style P3 fill:#000000,stroke:#388e3c,stroke-width:2px
 ```
 
 ### CI/CD Pipeline Flow with Test Gates
@@ -286,83 +242,79 @@ graph LR
 flowchart TD
     START([Code Commit]) --> BUILD[Build Solution]
     BUILD --> UNIT{Unit Tests<br/>60%}
-    
+
     UNIT -->|Pass| COV{Code Coverage<br/>≥ 80%?}
     UNIT -->|Fail| FAIL1[❌ Block PR/Deploy]
-    
-    COV -->|Yes| DEPLOY[Deploy to Test Env]
+
+    COV -->|Yes| DEV[Deploy to Dev Env]
     COV -->|No| FAIL2[❌ Block PR/Deploy]
-    
-    DEPLOY --> INT{Integration Tests<br/>30%}
-    
+
+    DEV --> INT{Integration Tests<br/>30%}
+
     INT -->|Pass| CONTRACT{Contract Tests<br/>Valid?}
-    INT -->|Fail| ROLLBACK[Rollback Deployment]
-    
+    INT -->|Fail| ROLLBACK[Rollback Deployment, ❌ Block PR/Deploy]
+
     CONTRACT -->|Pass| PERF{Performance<br/>Baseline Met?}
     CONTRACT -->|Fail| ROLLBACK
-    
-    PERF -->|Pass| SMOKE[Smoke Tests]
-    PERF -->|Fail| ALERT[Alert Team]
-    
-    SMOKE -->|Pass| APPROVE{Manual<br/>Approval}
+
+    PERF -->|Pass| SMOKE{Smoke Tests}
+    PERF -->|Fail| ROLLBACK
+
+    SMOKE -->|Pass| TEST[Deploy to Test Env]
     SMOKE -->|Fail| ROLLBACK
-    
-    APPROVE -->|Approved| PROD[Deploy to Production]
-    APPROVE -->|Rejected| STOP([Stop Pipeline])
-    
-    PROD --> E2E[Manual E2E Testing<br/>10%<br/>In Production]
-    E2E --> SUCCESS([✅ Complete])
-    
-    style UNIT fill:#95e1d3,stroke:#38a169,stroke-width:2px
-    style INT fill:#4ecdc4,stroke:#0a9396,stroke-width:2px
+
+    TEST --> E2E[Manual E2E Testing<br/>10%<br/>In Test Env]
+
+    E2E -->|Pass| PROD([✅ Deploy to Production])
+    E2E -->|Fail| ROLLBACK
+
+    style UNIT fill:#95e1d3,stroke:#38a169,stroke-width:2px,color:#000
+    style INT fill:#4ecdc4,stroke:#0a9396,stroke-width:2px,color:#000
     style E2E fill:#ff6b6b,stroke:#c92a2a,stroke-width:2px,color:#fff
     style FAIL1 fill:#ff6b6b,stroke:#c92a2a,stroke-width:2px,color:#fff
     style FAIL2 fill:#ff6b6b,stroke:#c92a2a,stroke-width:2px,color:#fff
-    style SUCCESS fill:#51cf66,stroke:#2f9e44,stroke-width:2px
+    style PROD fill:#51cf60,stroke:#2f9e44,stroke-width:2px,color:#000
 ```
 
 ### Azure Service Testing Strategy
 
 ```mermaid
 graph TB
+
     subgraph Azure Functions
-    AF_UNIT[Unit Tests 60%<br/>- Business Logic<br/>- Validators<br/>- Transformers<br/>- Mocked Triggers]
-    AF_INT[Integration Tests 30%<br/>- Real Triggers<br/>- Bindings<br/>- DI Container<br/>- Service Bus]
-    AF_E2E[Manual E2E 10%<br/>- Azure Portal<br/>- End-to-End Flow<br/>- Production-like]
+        direction LR
+        AF_UNIT[Unit Tests 60%<br/>- Business Logic<br/>- Validators<br/>- Transformers<br/>- Mocked Triggers]
+        AF_INT[Integration Tests 30%<br/>- Real Triggers<br/>- Bindings<br/>- DI Container<br/>- Service Bus]
+        AF_E2E[Manual E2E 10%<br/>- Azure Portal<br/>- End-to-End Flow<br/>- Production-like]
     end
-    
-    subgraph Logic Apps
-    LA_UNIT[Unit Tests 60%<br/>- Inline Code<br/>- Expressions<br/>- Custom Connectors]
-    LA_INT[Integration Tests 30%<br/>- Workflow Execution<br/>- Built-in Connectors<br/>- Managed Connectors]
-    LA_E2E[Manual E2E 10%<br/>- Designer Testing<br/>- Run History<br/>- Monitoring]
-    end
-    
-    subgraph Service Bus
-    SB_UNIT[Unit Tests 60%<br/>- Message Handlers<br/>- Serialization<br/>- Validation]
-    SB_INT[Integration Tests 30%<br/>- Queue Operations<br/>- Topics/Subscriptions<br/>- Dead Letter<br/>- Sessions]
-    SB_E2E[Manual E2E 10%<br/>- Message Flow<br/>- Ordering<br/>- Transactions]
-    end
-    
+
     AF_UNIT -.->|Foundation| AF_INT
     AF_INT -.->|Confidence| AF_E2E
-    
+
+    style AF_UNIT fill:#95e1d3,stroke:#38a169,stroke-width:2px,color:#000
+
+    style AF_INT fill:#4ecdc4,stroke:#0a9396,stroke-width:2px,color:#000
+
+    style AF_E2E fill:#ff6b6b,stroke:#c92a2a,stroke-width:2px,color:#000
+```
+```mermaid
+graph TB
+
+    subgraph Logic Apps
+        direction LR
+        LA_UNIT[Unit Tests 60%<br/>- Inline Code<br/>- Expressions<br/>- Custom Connectors]
+        LA_INT[Integration Tests 30%<br/>- Workflow Execution<br/>- Built-in Connectors<br/>- Managed Connectors]
+        LA_E2E[Manual E2E 10%<br/>- Designer Testing<br/>- Run History<br/>- Monitoring]
+    end
+
     LA_UNIT -.->|Foundation| LA_INT
     LA_INT -.->|Confidence| LA_E2E
-    
-    SB_UNIT -.->|Foundation| SB_INT
-    SB_INT -.->|Confidence| SB_E2E
-    
-    style AF_UNIT fill:#95e1d3,stroke:#38a169,stroke-width:2px
-    style LA_UNIT fill:#95e1d3,stroke:#38a169,stroke-width:2px
-    style SB_UNIT fill:#95e1d3,stroke:#38a169,stroke-width:2px
-    
-    style AF_INT fill:#4ecdc4,stroke:#0a9396,stroke-width:2px
-    style LA_INT fill:#4ecdc4,stroke:#0a9396,stroke-width:2px
-    style SB_INT fill:#4ecdc4,stroke:#0a9396,stroke-width:2px
-    
-    style AF_E2E fill:#ff6b6b,stroke:#c92a2a,stroke-width:2px,color:#fff
-    style LA_E2E fill:#ff6b6b,stroke:#c92a2a,stroke-width:2px,color:#fff
-    style SB_E2E fill:#ff6b6b,stroke:#c92a2a,stroke-width:2px,color:#fff
+
+    style LA_UNIT fill:#95e1d3,stroke:#38a169,stroke-width:2px,color:#000
+
+    style LA_INT fill:#4ecdc4,stroke:#0a9396,stroke-width:2px,color:#000
+
+    style LA_E2E fill:#ff6b6b,stroke:#c92a2a,stroke-width:2px,color:#000
 ```
 
 ### Test Execution Time Distribution
@@ -400,7 +352,7 @@ timeline
                 : CI/CD Integration
                 : Flaky Test Management
     section Phase 3
-        Month 7+ : Manual E2E Plans
+        Month 7+ : Automated E2E Plans
                  : 60/30/10 Balance
                  : Continuous Improvement
                  : Metrics & Monitoring
@@ -413,23 +365,23 @@ graph TD
     START{What are you<br/>testing?} -->|Single Function/Method| UNIT_Q{External<br/>Dependencies?}
     START -->|Multiple Components| INT_Q{Azure Services<br/>Involved?}
     START -->|Complete User Flow| E2E_Q{Can be<br/>Automated?}
-    
+
     UNIT_Q -->|No| UNIT[✅ Unit Test<br/>Mock Dependencies<br/>Fast & Isolated]
     UNIT_Q -->|Yes| UNIT_MOCK[✅ Unit Test<br/>with Mocks<br/>Test Logic Only]
-    
+
     INT_Q -->|Yes| INT_REAL[✅ Integration Test<br/>Real Azure Services<br/>Test Environment]
     INT_Q -->|No| INT_MOCK[⚠️ Consider Unit Test<br/>Or Integration with<br/>Local Emulators]
-    
+
     E2E_Q -->|No| E2E_MANUAL[✅ Manual E2E<br/>Test Plan<br/>Azure Portal]
     E2E_Q -->|Yes| E2E_WARNING[⚠️ Reconsider<br/>E2E automation is<br/>expensive & fragile]
-    
+
     E2E_WARNING --> E2E_MANUAL
-    
-    style UNIT fill:#95e1d3,stroke:#38a169,stroke-width:2px
-    style UNIT_MOCK fill:#95e1d3,stroke:#38a169,stroke-width:2px
-    style INT_REAL fill:#4ecdc4,stroke:#0a9396,stroke-width:2px
+
+    style UNIT fill:#95e1d3,stroke:#38a169,stroke-width:2px,color:#000
+    style UNIT_MOCK fill:#95e1d3,stroke:#38a169,stroke-width:2px,color:#000
+    style INT_REAL fill:#4ecdc4,stroke:#0a9396,stroke-width:2px,color:#000
     style E2E_MANUAL fill:#ff6b6b,stroke:#c92a2a,stroke-width:2px,color:#fff
-    style E2E_WARNING fill:#ffd43b,stroke:#f59f00,stroke-width:2px
+    style E2E_WARNING fill:#ffd43b,stroke:#f59f00,stroke-width:2px,color:#000
 ```
 
 ---
@@ -438,13 +390,9 @@ graph TD
 
 | Service                | Unit Testable in Step 1 | Integration Test in Step 2 |
 |------------------------|------------------------|--------------------------|
-| Logic Apps             | Inline code, expressions| Workflow, connectors, triggers |
-| Azure Functions        | All code, triggers (mocked) | Real triggers, bindings, integration |
-| Service Bus            | Message handlers (mocked) | Real queues/topics, integration |
-| Event Grid/Event Hubs  | Event handlers (mocked) | Real events, subscriptions |
-| API Management         | Policies (mocked), custom code | Live API flows, policies |
-| Data Factory           | Custom activities (mocked) | Pipeline runs, data movement |
-| Azure Storage          | Logic, helpers (mocked) | Real storage, data flows |
+| Azure Functions        | All code, business logics | Bindings, services, integration |
+| Logic Apps             | Inline code, expressions | Workflow, connectors, triggers |
+| Data Factory           | TBD (*Custom activities (mocked)*) | TBD (*Pipeline runs, data movement*) |
 
 - **Async/retries/failures:**
   - Step 1: Simulate with mocks (verify retry logic, timeout handling, error propagation)
@@ -457,28 +405,20 @@ graph TD
 - Step 2: Test real triggers (HTTP, Timer, Queue, Event Grid), bindings (CosmosDB, Blob, Table), and dependency injection
 
 **Logic Apps Standard:**
-- Step 1: Test inline JavaScript/C# code, expressions, custom connectors (mocked)
+- Step 1: Test inline JavaScript/C# code, expressions
 - Step 2: Test workflow execution, built-in connectors, managed connectors, triggers
-
-**Service Bus:**
-- Step 1: Test message handlers, serialization/deserialization, message validation
-- Step 2: Test real queue/topic operations, sessions, dead-letter handling, message ordering
-
-**API Management:**
-- Step 1: Test custom policy code, response transformations, validation logic
-- Step 2: Test live API flows, policy execution order, caching, rate limiting
 
 ---
 
 ## 3. Tooling and Frameworks
 
 ### Step 1 (Unit Testing)
-- **Azure Functions (.NET):** xUnit (recommended), MSTest, NUnit
-- **Mocking/Stubbing:** Moq (recommended), NSubstitute, FakeItEasy
-- **Assertions:** FluentAssertions (recommended), Shouldly
-- **Test Data:** AutoFixture, Bogus
-- **Logic Apps Inline Code:** Jest (JavaScript/TypeScript), Mocha, Jasmine
-- **Code Coverage:** Coverlet (.NET), Istanbul/nyc (JavaScript)
+- **Azure Functions (.NET):** xUnit
+- **Mocking/Stubbing:** Moq
+- **Assertions:** FluentAssertions
+- **Test Data:** AutoFixture
+- **Logic Apps Inline Code:** Jest
+- **Code Coverage:** **TBD** (Coverlet (.NET), Istanbul/nyc (JavaScript))
 - **CI:** GitHub Actions, Azure Pipelines
 - **Local Execution:** dotnet test, npm test
 
