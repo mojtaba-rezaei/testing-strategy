@@ -1,0 +1,200 @@
+# Azure Pipeline - Integration Tests
+# This pipeline executes Phase 2 integration tests against Azure services or Azurite
+# Triggers on pull requests and scheduled builds
+
+trigger: none  # Manual or scheduled only
+
+pr:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    include:
+      - 'src/**'
+      - 'tests/integration/**'
+      - 'infrastructure/**'
+
+schedules:
+  - cron: "0 2 * * *"  # Daily at 2 AM UTC
+    displayName: 'Nightly Integration Tests'
+    branches:
+      include:
+        - develop
+    always: true
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  buildConfiguration: 'Release'
+  dotnetVersion: '8.x'
+  azuriteVersion: 'latest'
+  testTimeout: 30  # minutes
+
+stages:
+  - stage: IntegrationTests
+    displayName: 'Integration Tests'
+    jobs:
+      - job: Setup
+        displayName: 'Setup Test Environment'
+        steps:
+          - task: UseDotNet@2
+            displayName: 'Install .NET $(dotnetVersion) SDK'
+            inputs:
+              version: '$(dotnetVersion)'
+              performMultiLevelLookup: true
+
+          - script: |
+              echo "Starting Azurite for local Azure Storage emulation..."
+              docker run -d -p 10000:10000 -p 10001:10001 -p 10002:10002 \
+                --name azurite \
+                mcr.microsoft.com/azure-storage/azurite:$(azuriteVersion)
+              
+              echo "Waiting for Azurite to be ready..."
+              timeout 30 bash -c 'until docker logs azurite 2>&1 | grep -q "Azurite Blob service is successfully listening"; do sleep 2; done'
+              
+              echo "Azurite is running ✅"
+            displayName: 'Start Azurite Docker Container'
+
+          - script: |
+              echo "Verifying Azurite connection..."
+              curl -s http://localhost:10000/ && echo "Blob endpoint OK" || echo "Blob endpoint FAILED"
+              curl -s http://localhost:10001/ && echo "Queue endpoint OK" || echo "Queue endpoint FAILED"
+              curl -s http://localhost:10002/ && echo "Table endpoint OK" || echo "Table endpoint FAILED"
+            displayName: 'Verify Azurite Endpoints'
+
+      - job: RunIntegrationTests
+        displayName: 'Execute Integration Tests'
+        dependsOn: Setup
+        timeoutInMinutes: $(testTimeout)
+        variables:
+          - group: integration-test-secrets  # Azure DevOps Variable Group
+        steps:
+          - task: UseDotNet@2
+            displayName: 'Install .NET $(dotnetVersion) SDK'
+            inputs:
+              version: '$(dotnetVersion)'
+              performMultiLevelLookup: true
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Restore NuGet Packages'
+            inputs:
+              command: 'restore'
+              projects: '**/*.IntegrationTests.csproj'
+              feedsToUse: 'select'
+              verbosityRestore: 'Minimal'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Build Integration Test Projects'
+            inputs:
+              command: 'build'
+              projects: '**/tests/integration/**/*.IntegrationTests.csproj'
+              arguments: '--configuration $(buildConfiguration) --no-restore'
+
+          - script: |
+              echo "Setting environment variables for integration tests..."
+              echo "##vso[task.setvariable variable=AZURE_STORAGE_CONNECTION_STRING]UseDevelopmentStorage=true;DevelopmentStorageProxyUri=http://localhost"
+              echo "##vso[task.setvariable variable=ASPNETCORE_ENVIRONMENT]Testing"
+            displayName: 'Configure Test Environment'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Run Integration Tests'
+            inputs:
+              command: 'test'
+              projects: '**/tests/integration/**/*.IntegrationTests.csproj'
+              arguments: >-
+                --configuration $(buildConfiguration)
+                --no-build
+                --no-restore
+                --logger trx
+                --results-directory $(Agent.TempDirectory)/TestResults
+                --filter "Category=Integration"
+                /p:VSTestBlame=true
+                /p:VSTestBlameCrash=true
+                /p:VSTestBlameHangTimeout=5m
+              publishTestResults: true
+            continueOnError: false
+            env:
+              AZURE_STORAGE_CONNECTION_STRING: $(AZURE_STORAGE_CONNECTION_STRING)
+              AZURE_SERVICE_BUS_CONNECTION_STRING: $(AZURE_SERVICE_BUS_CONNECTION_STRING)
+              AZURE_KEY_VAULT_URI: $(AZURE_KEY_VAULT_URI)
+              ASPNETCORE_ENVIRONMENT: $(ASPNETCORE_ENVIRONMENT)
+
+          - task: PublishTestResults@2
+            displayName: 'Publish Test Results'
+            inputs:
+              testResultsFormat: 'VSTest'
+              testResultsFiles: '$(Agent.TempDirectory)/TestResults /**/*.trx'
+              mergeTestResults: true
+              failTaskOnFailedTests: true
+              testRunTitle: 'Integration Tests - $(Build.BuildNumber)'
+            condition: succeededOrFailed()
+
+          - script: |
+              echo "Collecting Azurite logs for diagnostics..."
+              docker logs azurite > $(Agent.TempDirectory)/azurite.log 2>&1
+            displayName: 'Collect Azurite Logs'
+            condition: always()
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish Test Logs'
+            inputs:
+              PathtoPublish: '$(Agent.TempDirectory)'
+              ArtifactName: 'IntegrationTestLogs'
+              publishLocation: 'Container'
+            condition: always()
+
+          - script: |
+              echo "Analyzing test results for flaky tests..."
+              FAILED_TESTS=$(find $(Agent.TempDirectory)/TestResults -name '*.trx' -exec grep -l 'outcome="Failed"' {} \;)
+              if [ -n "$FAILED_TESTS" ]; then
+                echo "##vso[task.logissue type=warning]Flaky tests detected. Review logs."
+                echo "$FAILED_TESTS" | while read file; do
+                  grep -A 5 'outcome="Failed"' "$file"
+                done
+              fi
+            displayName: 'Analyze Flaky Tests'
+            condition: failed()
+
+          - script: |
+              echo "=========================================="
+              echo "Integration Test Summary"
+              echo "=========================================="
+              echo "Build Number: $(Build.BuildNumber)"
+              echo "Branch: $(Build.SourceBranch)"
+              echo "Test Category: Integration"
+              echo "Timeout: $(testTimeout) minutes"
+              echo "Status: PASSED ✅"
+              echo "=========================================="
+            displayName: 'Print Test Summary'
+            condition: succeeded()
+
+      - job: Cleanup
+        displayName: 'Cleanup Test Environment'
+        dependsOn:
+          - Setup
+          - RunIntegrationTests
+        condition: always()
+        steps:
+          - script: |
+              echo "Stopping and removing Azurite container..."
+              docker stop azurite || true
+              docker rm azurite || true
+              echo "Cleanup complete ✅"
+            displayName: 'Stop Azurite Container'
+
+# Optional: Performance metrics collection
+# Uncomment if you want to track test execution time trends
+# - stage: Metrics
+#   displayName: 'Collect Performance Metrics'
+#   dependsOn: IntegrationTests
+#   condition: succeeded()
+#   jobs:
+#     - job: CollectMetrics
+#       steps:
+#         - script: |
+#             echo "Collecting test execution metrics..."
+#             # Parse TRX files for execution times
+#             # Send to Application Insights or Log Analytics
+#           displayName: 'Extract Performance Metrics'

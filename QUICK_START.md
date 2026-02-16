@@ -63,56 +63,55 @@ using FluentAssertions;
 using YourFunctionApp.Services;
 using YourFunctionApp.Models;
 
-namespace YourFunctionApp.UnitTests.Services
+namespace YourFunctionApp.UnitTests.Services;
+
+public class OrderServiceTests
 {
-    public class OrderServiceTests
+    [Fact]
+    public async Task ValidateOrder_WithValidOrder_ReturnsTrue()
     {
-        [Fact]
-        public async Task ValidateOrder_WithValidOrder_ReturnsTrue()
-        {
-            // Arrange
-            var orderService = new OrderService();
-            var order = new Order 
-            { 
-                Id = "123", 
-                Amount = 100.00m 
-            };
+        // Arrange
+        var orderService = new OrderService();
+        var order = new Order 
+        { 
+            Id = "123", 
+            Amount = 100.00m 
+        };
 
-            // Act
-            var result = await orderService.ValidateOrder(order);
+        // Act
+        var result = await orderService.ValidateOrder(order);
 
-            // Assert
-            result.Should().BeTrue();
-        }
+        // Assert
+        result.Should().BeTrue();
+    }
 
-        [Fact]
-        public async Task ValidateOrder_WithNullOrder_ReturnsFalse()
-        {
-            // Arrange
-            var orderService = new OrderService();
+    [Fact]
+    public async Task ValidateOrder_WithNullOrder_ReturnsFalse()
+    {
+        // Arrange
+        var orderService = new OrderService();
 
-            // Act
-            var result = await orderService.ValidateOrder(null);
+        // Act
+        var result = await orderService.ValidateOrder(null);
 
-            // Assert
-            result.Should().BeFalse();
-        }
+        // Assert
+        result.Should().BeFalse();
+    }
 
-        [Theory]
-        [InlineData(0)]
-        [InlineData(-10)]
-        public async Task ValidateOrder_WithInvalidAmount_ReturnsFalse(decimal amount)
-        {
-            // Arrange
-            var orderService = new OrderService();
-            var order = new Order { Id = "123", Amount = amount };
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-10)]
+    public async Task ValidateOrder_WithInvalidAmount_ReturnsFalse(decimal amount)
+    {
+        // Arrange
+        var orderService = new OrderService();
+        var order = new Order { Id = "123", Amount = amount };
 
-            // Act
-            var result = await orderService.ValidateOrder(order);
+        // Act
+        var result = await orderService.ValidateOrder(order);
 
-            // Assert
-            result.Should().BeFalse();
-        }
+        // Assert
+        result.Should().BeFalse();
     }
 }
 ```
@@ -238,7 +237,7 @@ Use this checklist to track Phase 1 compliance:
 ### To Continue with Phase 1:
 1. Add tests for all new code you write
 2. Target 80% code coverage for critical components
-3. Review [AUTOMATION_TESTING_STANDARD.md](AUTOMATION_TESTING_STANDARD.md) Section 6 for Definition of Done
+3. Review [AUTOMATION_TESTING_STANDARD.md](architecture/docs/AUTOMATION_TESTING_STANDARD.md) Section 6 for Definition of Done
 4. Use test builders from Section 8.3 for complex test data
 
 ### To Move to Phase 2 (Integration Testing):
@@ -266,18 +265,11 @@ Use this checklist to track Phase 1 compliance:
 
 ## Getting Help
 
-- 📚 **Full Standard:** [AUTOMATION_TESTING_STANDARD.md](AUTOMATION_TESTING_STANDARD.md)
-- 💬 **Slack:** #testing-standards
-- 📧 **Email:** testing-standards@company.com
-- 🎓 **Training:** Internal wiki for self-paced courses
+- 📚 **Full Standard:** [AUTOMATION_TESTING_STANDARD.md](architecture/docs/AUTOMATION_TESTING_STANDARD.md)
 
 ## Templates
 
-Find ready-to-use templates in the `/templates` folder:
-- Unit test project template
-- Sample test classes
-- Pipeline templates
-- Test utilities
+Find ready-to-use templates in the `/samples` folder:
 
 ---
 

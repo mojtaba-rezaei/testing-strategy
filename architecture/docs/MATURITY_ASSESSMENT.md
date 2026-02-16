@@ -8,9 +8,7 @@ Use this checklist to assess your project's current testing maturity and track p
 2. Check items that are currently in place
 3. Calculate your maturity score
 4. Identify gaps and create action plan
-5. Re-assess monthly
 
----
 
 ## Phase 1: Unit Testing Foundation
 
@@ -18,10 +16,10 @@ Use this checklist to assess your project's current testing maturity and track p
 
 - [ ] Unit test project created following naming convention (`<Component>.UnitTests`)
 - [ ] Folder structure follows standard (`/tests/unit`, `/tests/integration`, `/tests/shared`)
-- [ ] Test framework configured (xUnit, MSTest, or NUnit)
-- [ ] Mocking library available (Moq, NSubstitute)
-- [ ] Assertion library available (FluentAssertions recommended)
-- [ ] Test data generation tools (AutoFixture, Bogus)
+- [ ] Test framework configured (xUnit)
+- [ ] Mocking library available (eg. Moq)
+- [ ] Assertion library available (FluentAssertions)
+- [ ] Test data generation tools (AutoFixture)
 
 **Score:** ___ / 6
 
@@ -40,10 +38,10 @@ Use this checklist to assess your project's current testing maturity and track p
 ### CI/CD Integration (Weight: 25%)
 
 - [ ] Unit tests run on every PR
-- [ ] Unit tests run on every commit to main/develop
+- [ ] Unit tests run on every commit to all branches
 - [ ] Pipeline fails if tests fail
 - [ ] Test results published to pipeline
-- [ ] Code coverage reports generated
+- [ ] Code coverage reports generated (?)
 - [ ] Coverage threshold enforced (≥ 80%)
 - [ ] Test execution time < 5 minutes
 - [ ] No manual steps required
@@ -68,12 +66,9 @@ Use this checklist to assess your project's current testing maturity and track p
 - [ ] Testing is part of Definition of Done
 - [ ] Team writes tests before or with code
 - [ ] Team comfortable with testing tools
-- [ ] Testing standards referenced in README
 - [ ] New team members onboarded on testing
 
 **Score:** ___ / 6
-
----
 
 ### Phase 1 Total Score
 
@@ -87,9 +82,7 @@ Use this checklist to assess your project's current testing maturity and track p
 
 **Ready for Phase 2?** Score ≥ 75% + No critical gaps
 
----
-
-## Phase 2: Integration Testing
+## Phase 2: Integration Testing **TBD**
 
 ### Test Infrastructure (Weight: 20%)
 
@@ -150,8 +143,6 @@ Use this checklist to assess your project's current testing maturity and track p
 
 **Score:** ___ / 5
 
----
-
 ### Phase 2 Total Score
 
 **Total:** ___ / 34 = ___% 
@@ -162,13 +153,10 @@ Use this checklist to assess your project's current testing maturity and track p
 - 🟢 75-89%: Mature - Minor Improvements
 - ✅ 90-100%: Advanced - Ready for Phase 3
 
----
-
 ## Governance Compliance
 
 ### Standards Adherence (Required)
 
-- [ ] Testing standard referenced in README
 - [ ] Naming conventions followed
 - [ ] Folder structure matches standard
 - [ ] PR template includes test checklist
@@ -185,9 +173,8 @@ Use this checklist to assess your project's current testing maturity and track p
 - [ ] Test data is non-sensitive
 - [ ] Test data complies with data protection regulations
 - [ ] Test environments isolated from production
-- [ ] Access controls on test environments
 
-**Score:** ___ / 6
+**Score:** ___ / 5
 
 ### Metrics & Monitoring (Recommended)
 
@@ -199,15 +186,12 @@ Use this checklist to assess your project's current testing maturity and track p
 
 **Score:** ___ / 5
 
----
 
 ### Governance Total Score
 
 **Total:** ___ / 18 = ___% 
 
 **Minimum Required:** 85% for full compliance
-
----
 
 ## Overall Assessment
 
@@ -217,8 +201,6 @@ Use this checklist to assess your project's current testing maturity and track p
 | Phase 2: Integration Testing | ___% | 30% | ___% |
 | Governance & Compliance | ___% | 10% | ___% |
 | **TOTAL** | | **100%** | **___%** |
-
----
 
 ## Action Plan Template
 
@@ -255,8 +237,6 @@ Based on your assessment, identify top 3-5 priority gaps:
 - **Target Date:** 
 - **Status:** 
 
----
-
 ## Recommendations by Score
 
 ### If Overall Score < 50%
@@ -264,14 +244,12 @@ Based on your assessment, identify top 3-5 priority gaps:
 - Start with basic unit test setup
 - Get CI pipeline running
 - Target one component/service at a time
-- Schedule weekly check-ins with test leads
 
 ### If Overall Score 50-74%
 - Continue Phase 1 improvements
 - Focus on coverage gaps
 - Improve test quality (speed, reliability)
 - Address governance basics
-- Monthly progress reviews
 
 ### If Overall Score 75-89%
 - Complete Phase 1 exit criteria
@@ -283,35 +261,8 @@ Based on your assessment, identify top 3-5 priority gaps:
 ### If Overall Score ≥ 90%
 - Maintain current quality
 - Begin/continue Phase 2
-- Mentor other teams
 - Contribute to standards improvements
 - Consider Phase 3 (advanced testing)
-
----
-
-## Next Steps
-
-1. **Schedule Review Meeting**
-   - Review results with team
-   - Discuss gaps and priorities
-   - Create action plan
-
-2. **Get Help**
-   - Slack: #testing-standards
-   - Office Hours: Thursdays 3-4 PM
-   - Email: testing-standards@company.com
-
-3. **Track Progress**
-   - Re-assess monthly
-   - Update action plan
-   - Celebrate improvements
-
-4. **Share Success**
-   - Demo in Community of Practice
-   - Write case study
-   - Help other teams
-
----
 
 ## Assessment History
 
@@ -322,7 +273,3 @@ Track your progress over time:
 | 2026-02 | ___% | ___% | ___% | ___% | Initial assessment |
 | | | | | | |
 | | | | | | |
-
----
-
-**Questions about scoring or interpretation?** Contact testing-standards@company.com

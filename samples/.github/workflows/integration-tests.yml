@@ -1,0 +1,317 @@
+name: Integration Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'src/**'
+      - 'tests/integration/**'
+      - 'infrastructure/**'
+    types:
+      - labeled  # Run when PR is labeled with 'integration-test'
+  schedule:
+    - cron: '0 2 * * *'  # Daily at 2 AM UTC
+  workflow_dispatch:  # Allow manual trigger
+    inputs:
+      test-category:
+        description: 'Test category to run (Integration, Performance, Contract, or All)'
+        required: false
+        default: 'All'
+        type: choice
+        options:
+          - All
+          - Integration
+          - Performance
+          - Contract
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  checks: write
+
+jobs:
+  integration-tests:
+    name: Run Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    
+    # Only run if PR has 'integration-test' label, scheduled, or manual
+    if: |
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'integration-test'))
+    
+    services:
+      azurite:
+        image: mcr.microsoft.com/azure-storage/azurite:latest
+        ports:
+          - 10000:10000
+          - 10001:10001
+          - 10002:10002
+        options: >-
+          --health-cmd "nc -z localhost 10000 && nc -z localhost 10001 && nc -z localhost 10002"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      AZURE_STORAGE_CONNECTION_STRING: 'DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://localhost:10000/devstoreaccount1;QueueEndpoint=http://localhost:10001/devstoreaccount1;TableEndpoint=http://localhost:10002/devstoreaccount1;'
+      ASPNETCORE_ENVIRONMENT: Testing
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-integration-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-integration-
+            ${{ runner.os }}-nuget-
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build solution
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Wait for Azurite to be ready
+        run: |
+          echo "Waiting for Azurite services..."
+          timeout 60 bash -c 'until nc -z localhost 10000; do sleep 2; done'
+          timeout 60 bash -c 'until nc -z localhost 10001; do sleep 2; done'
+          timeout 60 bash -c 'until nc -z localhost 10002; do sleep 2; done'
+          echo "✅ Azurite is ready"
+
+      - name: Verify Azure Storage connection
+        run: |
+          echo "Testing Blob Storage connection..."
+          curl -s http://localhost:10000/devstoreaccount1?comp=list || echo "Blob endpoint check completed"
+          
+          echo "Testing Queue Storage connection..."
+          curl -s http://localhost:10001/devstoreaccount1?comp=list || echo "Queue endpoint check completed"
+          
+          echo "Testing Table Storage connection..."
+          curl -s http://localhost:10002/Tables || echo "Table endpoint check completed"
+
+      - name: Determine test filter
+        id: test-filter
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            CATEGORY="${{ inputs.test-category }}"
+          else
+            CATEGORY="All"
+          fi
+          
+          if [ "$CATEGORY" == "All" ]; then
+            FILTER="Category=Integration|Category=Performance|Category=Contract"
+          else
+            FILTER="Category=$CATEGORY"
+          fi
+          
+          echo "filter=$FILTER" >> $GITHUB_OUTPUT
+          echo "Running tests with filter: $FILTER"
+
+      - name: Run integration tests
+        env:
+          AZURE_SERVICE_BUS_CONNECTION_STRING: ${{ secrets.AZURE_SERVICE_BUS_CONNECTION_STRING }}
+          AZURE_KEY_VAULT_URI: ${{ secrets.AZURE_KEY_VAULT_URI }}
+          AZURE_COSMOS_DB_CONNECTION_STRING: ${{ secrets.AZURE_COSMOS_DB_CONNECTION_STRING }}
+        run: |
+          dotnet test tests/integration/**/*.IntegrationTests.csproj \
+            --configuration Release \
+            --no-build \
+            --no-restore \
+            --verbosity normal \
+            --logger "trx;LogFileName=integration-test-results.trx" \
+            --logger "console;verbosity=detailed" \
+            --results-directory ./TestResults \
+            --filter "${{ steps.test-filter.outputs.filter }}" \
+            /p:VSTestBlame=true \
+            /p:VSTestBlameCrash=true \
+            /p:VSTestBlameHangTimeout=10m
+
+      - name: Retry failed tests
+        if: failure()
+        run: |
+          echo "Retrying failed tests..."
+          dotnet test tests/integration/**/*.IntegrationTests.csproj \
+            --configuration Release \
+            --no-build \
+            --no-restore \
+            --verbosity detailed \
+            --logger "trx;LogFileName=retry-test-results.trx" \
+            --results-directory ./TestResults \
+            --filter "${{ steps.test-filter.outputs.filter }}" \
+            || echo "Retry completed (some tests may still fail)"
+
+      - name: Publish test results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: |
+            TestResults/**/*.trx
+          check_name: Integration Test Results
+          comment_mode: always
+
+      - name: Analyze flaky tests
+        if: failure()
+        run: |
+          echo "## Flaky Test Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "Analyzing test results for flaky tests..." >> $GITHUB_STEP_SUMMARY
+          
+          # Find failed tests in TRX files
+          find ./TestResults -name "*.trx" -exec grep -l 'outcome="Failed"' {} \; | while read file; do
+            echo "### Failed in: $(basename $file)" >> $GITHUB_STEP_SUMMARY
+            grep -A 5 'outcome="Failed"' "$file" | head -20 >> $GITHUB_STEP_SUMMARY || true
+          done
+
+      - name: Upload test results artifact
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: integration-test-results
+          path: TestResults/
+          retention-days: 14
+
+      - name: Upload Azurite logs (on failure)
+        if: failure()
+        run: |
+          echo "Azurite service logs:" > azurite-logs.txt
+          docker logs ${{ job.services.azurite.id }} >> azurite-logs.txt 2>&1 || echo "Could not retrieve Azurite logs"
+      
+      - name: Upload Azurite logs artifact
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: azurite-logs
+          path: azurite-logs.txt
+          retention-days: 7
+
+      - name: Create issue for persistent failures
+        if: failure() && github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `Integration Tests Failed - ${new Date().toISOString().split('T')[0]}`;
+            const body = `
+            ## Integration Test Failure Alert
+            
+            **Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            **Branch:** ${{ github.ref_name }}
+            **Commit:** ${{ github.sha }}
+            **Triggered:** Scheduled run
+            
+            ### Action Required
+            1. Review test results artifact
+            2. Check Azurite logs
+            3. Investigate flaky tests
+            4. Update tests or fix bugs
+            
+            ### Quick Links
+            - [Test Results](${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID})
+            - [Integration Test Documentation](../../PHASE_2_INTEGRATION_TESTING.md)
+            
+            cc: @team-integration-platform
+            `;
+            
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['testing', 'integration-tests', 'automated-issue']
+            });
+
+      - name: Notify Slack on failure
+        if: failure() && (github.event_name == 'schedule' || github.event_name == 'push')
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            curl -X POST -H 'Content-type: application/json' \
+              --data "{
+                \"text\": \":x: Integration Tests Failed\",
+                \"blocks\": [
+                  {
+                    \"type\": \"header\",
+                    \"text\": {
+                      \"type\": \"plain_text\",
+                      \"text\": \":x: Integration Tests Failed\"
+                    }
+                  },
+                  {
+                    \"type\": \"section\",
+                    \"fields\": [
+                      {\"type\": \"mrkdwn\", \"text\": \"*Repository:*\n${{ github.repository }}\"},
+                      {\"type\": \"mrkdwn\", \"text\": \"*Branch:*\n${{ github.ref_name }}\"},
+                      {\"type\": \"mrkdwn\", \"text\": \"*Workflow:*\n${{ github.workflow }}\"},
+                      {\"type\": \"mrkdwn\", \"text\": \"*Run:*\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|#${{ github.run_number }}>\"}
+                    ]
+                  }
+                ]
+              }" \
+              $SLACK_WEBHOOK_URL
+          fi
+
+      - name: Test Summary
+        if: always()
+        run: |
+          echo "=========================================="
+          echo "Integration Test Summary"
+          echo "=========================================="
+          echo "Workflow: ${{ github.workflow }}"
+          echo "Run Number: ${{ github.run_number }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Event: ${{ github.event_name }}"
+          echo "Test Filter: ${{ steps.test-filter.outputs.filter }}"
+          echo "=========================================="
+
+  # Optional: Performance metrics collection job
+  collect-metrics:
+    name: Collect Test Metrics
+    needs: integration-tests
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Download test results
+        uses: actions/download-artifact@v3
+        with:
+          name: integration-test-results
+          path: ./TestResults
+
+      - name: Calculate test metrics
+        run: |
+          echo "## Test Execution Metrics" >> $GITHUB_STEP_SUMMARY
+          
+          # Count total tests
+          TOTAL_TESTS=$(find ./TestResults -name "*.trx" -exec grep -c 'UnitTestResult' {} + | awk '{s+=$1} END {print s}')
+          echo "- **Total Tests:** $TOTAL_TESTS" >> $GITHUB_STEP_SUMMARY
+          
+          # Count passed tests
+          PASSED_TESTS=$(find ./TestResults -name "*.trx" -exec grep -c 'outcome="Passed"' {} + | awk '{s+=$1} END {print s}')
+          echo "- **Passed:** $PASSED_TESTS" >> $GITHUB_STEP_SUMMARY
+          
+          # Count failed tests
+          FAILED_TESTS=$(find ./TestResults -name "*.trx" -exec grep -c 'outcome="Failed"' {} + | awk '{s+=$1} END {print s}')
+          echo "- **Failed:** $FAILED_TESTS" >> $GITHUB_STEP_SUMMARY
+          
+          # Calculate pass rate
+          if [ "$TOTAL_TESTS" -gt 0 ]; then
+            PASS_RATE=$(echo "scale=2; $PASSED_TESTS * 100 / $TOTAL_TESTS" | bc)
+            echo "- **Pass Rate:** ${PASS_RATE}%" >> $GITHUB_STEP_SUMMARY
+          fi

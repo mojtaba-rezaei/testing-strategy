@@ -99,17 +99,7 @@ All samples demonstrate:
 - Custom connectors
 - Integration with Service Bus
 
-### ApiManagementPolicies
-- API Management custom policies
-- Request/response transformations
-- Policy testing strategies
-
-### ServiceBusProcessor
-- Service Bus message processing
-- Retry and error handling
-- Dead-letter queue handling
-
-### DataFactoryPipeline
+### DataFactory **TBD**
 - Custom Data Factory activities
 - Data transformation logic
 - Pipeline orchestration
@@ -146,8 +136,6 @@ Want to add a sample project? Follow these guidelines:
 
 - 📚 [Automation Testing Standard](../AUTOMATION_TESTING_STANDARD.md)
 - 🚀 [Quick Start Guide](../QUICK_START.md)
-- 💬 Slack: #testing-standards
-- 📧 Email: testing-standards@company.com
 
 ## Quick Reference
 

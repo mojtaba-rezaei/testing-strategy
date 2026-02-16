@@ -12,7 +12,7 @@ This plan outlines how to design and implement a company-wide automation testing
    - Define folder/repo structure, naming conventions, and CI/CD pipeline integration for unit tests.
    - Set minimum quality gates and Definition of Done for this phase.
 3. **Step 2: Mature Integration Testing**
-   - Expand the standard to cover integration and contract testing between Azure components, and performance testing.
+   - Expand the standard to cover integration and contract testing between Azure components (, and performance testing).
    - End-to-end tests are performed manually in release/test environments via Azure portal and are not automated.
    - Recommend additional tools (infrastructure-aware, Azure-native, open/commercial).
    - Update folder structure, CI/CD stages, and quality gates for integration tests.

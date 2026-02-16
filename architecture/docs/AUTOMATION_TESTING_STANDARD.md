@@ -430,17 +430,14 @@ graph TD
   - Azure CLI (resource provisioning/cleanup)
 - **Open-source:** 
   - Postman/Newman (API contract testing)
-  - WireMock (HTTP service mocking)
   - TestContainers (infrastructure dependencies)
-  - SpecFlow/Cucumber (BDD-style integration tests)
-  - REST Assured (API testing)
 - **Azure SDK for Testing:**
   - Azure.Messaging.ServiceBus (integration tests)
   - Azure.Storage.Blobs (integration tests)
   - Microsoft.Azure.WebJobs.Extensions.* (binding validation)
-- **Performance/Load:**
-  - Azure Load Testing
-  - k6, JMeter, Gatling (open-source alternatives)
+- **Performance/Load (TBD):**
+  - *Azure Load Testing*
+  - *k6, Gatling (open-source alternatives)*
 - **Contract Testing:**
   - Pact (consumer-driven contracts)
   - JSON Schema validators
@@ -451,7 +448,7 @@ graph TD
 ## 4. CI/CD and Automation
 
 ### Step 1 — Unit Testing Pipeline
-- **Trigger:** Every PR and commit to main/develop branches
+- **Trigger:** Every PR and commit to every branches
 - **Execution:** < 5 minutes total
 - **Quality Gates:**
   - All unit tests must pass (0 failures)
@@ -462,32 +459,26 @@ graph TD
   - Publish test results to pipeline
   - Publish code coverage report
   - Block PR merge if quality gates fail
-- **Artifacts:**
+- **Artifacts: (?)**
   - Code coverage reports
   - Test result files (TRX, JUnit XML)
 
 ### Step 2 — Integration Testing Pipeline
-- **Trigger:** Post-deployment to dev/test environments
+- **Trigger:** Every PR to test (if possible prod too) environment
 - **Prerequisites:** Unit tests passed, deployment successful
 - **Execution:** < 15 minutes total
-- **Environment:** Dedicated test environment (isolated from production)
+- **Environment:** Dedicated test environment
 - **Quality Gates:**
   - All integration tests must pass
   - Performance baseline not degraded (< 10% regression)
   - Contract tests validate API/message schemas
   - Smoke tests verify critical paths
-- **Test Isolation:**
-  - Each test run uses unique test data
-  - Cleanup after test execution (delete test resources)
-  - No shared state between tests
-- **Flaky Test Handling:**
+- **Flaky Test Handling, if possible:**
   - Retry flaky tests up to 2 times
   - Track flaky test metrics
   - Mark consistently flaky tests as quarantined (don't block pipeline)
-  - Weekly review of flaky tests
 - **Promotion:**
   - Deploy to next environment only if all gates pass
-  - Manual approval for production deployment
 
 ---
 
@@ -499,11 +490,10 @@ graph TD
   - Integration: `<Component>.IntegrationTests`
 - **Test Files:** 
   - C#: `<Target>Tests.cs` (e.g., `OrderServiceTests.cs`)
-  - JavaScript/TypeScript: `<target>.test.js` or `<target>.spec.js`
+  - JavaScript/TypeScript: `<target>.tests.js`
 - **Test Methods/Functions:**
   - Pattern: `<MethodName>_<Scenario>_<ExpectedResult>`
   - Example: `ProcessOrder_WithInvalidData_ThrowsValidationException`
-  - Alternative (BDD): `Given_When_Then` pattern
 
 ### Folder Structure
 ```
@@ -547,17 +537,15 @@ graph TD
   - Mock factories
   - Test fixtures
   - Helper methods
-- **Versioning:** Shared utilities should be versioned and published as internal NuGet/npm packages for multi-repo scenarios
 
 ### Test Data Management
-- **Unit Tests:** Use in-memory test data builders (AutoFixture, Bogus)
+- **Unit Tests:** Use in-memory test data builders (AutoFixture)
 - **Integration Tests:** 
   - Use dedicated test data files (`/tests/integration/TestData`)
   - JSON files for message payloads
   - SQL scripts for database setup
-  - Terraform/Bicep for infrastructure setup
 
-### Code Reusability
+### Code Reusability Tips
 - Create base test classes for common setup/teardown
 - Use test fixtures for shared context
 - Implement custom assertions for domain-specific validation
@@ -581,7 +569,7 @@ graph TD
 - [ ] Contract tests validate API/message schemas
 - [ ] Integration tests pass in test environment
 - [ ] Performance baselines established and met
-- [ ] Test data cleanup automated
+- [ ] Test data cleanup automated (if possible/needed)
 - [ ] No manual intervention required
 
 ### Minimum Expectations
@@ -600,15 +588,9 @@ graph TD
   - [ ] Test data is clear and meaningful
 
 ### Environment Isolation
-- **Integration Test Environments:**
-  - Dedicated test subscriptions/resource groups
-  - No shared resources with production
-  - Network isolation where applicable
-  - Separate identity/credentials
 - **Test Data Isolation:**
   - Use unique identifiers/timestamps for test data
   - Automated cleanup after test runs
-  - No production data in test environments
 
 ### Security and Compliance
 - **Secret Management:**
@@ -635,11 +617,9 @@ graph TD
 - **Alerting:**
   - Alert on consistent test failures
   - Alert on significant coverage drops
-  - Weekly reports on test health
 
 ### Test Maintenance
 - **Regular Reviews:**
-  - Quarterly review of test suite health
   - Remove obsolete tests
   - Refactor duplicated test code
   - Update tests for deprecated features
@@ -647,7 +627,6 @@ graph TD
   - Keep unit tests fast (< 100ms each)
   - Optimize slow integration tests
   - Parallelize test execution where possible
-  - Monitor total pipeline execution time
 
 ---
 
@@ -723,248 +702,18 @@ if ($compliant) {
 | **New Code Coverage** | 100% | ≥ 90% | < 80% (Blocker) |
 
 **Coverage Trends:**
-- Track coverage weekly
 - Report coverage delta on each PR
 - Prevent coverage regression (no decrease > 2%)
 
-#### 3. Test Execution Metrics
-
-| Metric | Phase 1 Target | Phase 2 Target | Measurement |
-|--------|---------------|---------------|-------------|
-| **Unit Test Execution Time** | < 5 minutes | < 5 minutes | Total time for all unit tests |
-| **Integration Test Execution Time** | N/A (Phase 2) | < 15 minutes | Total time for all integration tests |
-| **Total Pipeline Time** | < 8 minutes | < 25 minutes | End-to-end CI/CD execution |
-| **Average Unit Test Duration** | < 100ms | < 100ms | Mean time per unit test |
-| **Average Integration Test Duration** | N/A | < 3 seconds | Mean time per integration test |
-
-**Performance Monitoring:**
-```yaml
-# Azure Pipeline task to monitor test execution time
-- task: PowerShell@2
-  displayName: 'Monitor Test Performance'
-  inputs:
-    targetType: 'inline'
-    script: |
-      $testDuration = $(Build.TestRunDuration)
-      $threshold = 300 # 5 minutes in seconds
-      
-      if ($testDuration -gt $threshold) {
-        Write-Warning "⚠️ Test execution time ($testDuration s) exceeds threshold ($threshold s)"
-        Write-Host "##vso[task.logissue type=warning]Tests are too slow"
-      } else {
-        Write-Host "✅ Test performance acceptable ($testDuration s)"
-      }
-```
-
-#### 4. Test Quality Metrics
-
-| Metric | Target | Action Required If |
-|--------|--------|-------------------|
-| **Flaky Test Rate** | < 2% | > 5% - Immediate investigation<br/>> 10% - Block deployments |
-| **Test Pass Rate** | 100% | < 100% - Fix immediately |
-| **Skipped/Ignored Tests** | 0 | > 0 - Require justification |
-| **Test Maintainability Index** | > 80 | < 60 - Refactor tests |
-
-**Flaky Test Detection:**
-```csharp
-// Run tests multiple times to detect flakiness
-dotnet test --logger "trx" -- RunConfiguration.MaxCpuCount=1
-
-// Analyze results for inconsistency
-// Flag tests that fail intermittently
-```
-
-#### 5. Defect Metrics
-
-| Metric | Target | Formula |
-|--------|--------|---------|
-| **Defect Escape Rate** | < 5% | (Production Bugs / Total Bugs Found) × 100 |
-| **Bug Detection in Testing** | > 80% | (Bugs Found in Testing / Total Bugs) × 100 |
-| **Critical Bugs in Production** | 0 per release | Count of severity-1 bugs |
-| **Test-Prevented Defects** | Track & Report | Bugs caught by tests before production |
-
-**Defect Tracking:**
-- Tag bugs with detection phase (unit-test, integration-test, production)
-- Analyze root cause for escaped defects
-- Add regression tests for all production bugs
-
-#### 6. Maturity Metrics
-
-| Phase | Maturity Score | Calculation |
-|-------|---------------|-------------|
-| **Phase 1** | 0-100 | Based on [MATURITY_ASSESSMENT.md](MATURITY_ASSESSMENT.md) checklist |
-| **Phase 2** | 0-100 | Based on [MATURITY_ASSESSMENT.md](MATURITY_ASSESSMENT.md) checklist |
-| **Overall Maturity** | 0-100 | Weighted average of all phases |
-
-**Maturity Levels:**
-- 🔴 **0-49%:** Not Compliant - Immediate action required
-- 🟡 **50-74%:** Partially Compliant - Improvement plan needed
-- 🟢 **75-89%:** Mostly Compliant - Minor gaps
-- ✅ **90-100%:** Fully Compliant - Maintain and improve
-
-### Reporting and Dashboards
-
-#### 1. Daily Metrics (Automated)
-- Test pass/fail rate
-- Test execution time
-- Code coverage (per PR)
-- Pipeline success rate
-
-#### 2. Weekly Metrics (Team Review)
-- Test distribution (60-30-10)
-- Flaky test trends
-- Coverage trends
-- Test performance trends
-
-#### 3. Monthly Metrics (Leadership Review)
-- Maturity score
-- Defect escape rate
-- Testing ROI (bugs prevented vs. found in production)
-- Team productivity impact
-
-#### 4. Quarterly Metrics (Strategic Review)
-- Testing strategy effectiveness
-- Phase transition readiness
-- Compliance audit results
-- Industry benchmark comparison
-
-### Dashboard Example (Azure DevOps)
-
-```yaml
-# widgets.json - Azure DevOps dashboard configuration
-{
-  "widgets": [
-    {
-      "name": "Test Results Trend",
-      "type": "Microsoft.VisualStudioOnline.Dashboards.TestResultsTrendWidget",
-      "settings": {
-        "pipelineId": "*",
-        "resultTypes": ["Passed", "Failed", "NotExecuted"]
-      }
-    },
-    {
-      "name": "Code Coverage",
-      "type": "Microsoft.VisualStudioOnline.Dashboards.CodeCoverageWidget",
-      "settings": {
-        "threshold": 80
-      }
-    },
-    {
-      "name": "Test Distribution",
-      "type": "Custom.TestPyramidWidget",
-      "settings": {
-        "unitTarget": 60,
-        "integrationTarget": 30,
-        "e2eTarget": 10
-      }
-    }
-  ]
-}
-```
-
-### Metrics Automation
-
-**PowerShell Script for Test Metrics Collection:**
-
-```powershell
-# collect-test-metrics.ps1
-param(
-    [string]$TestResultsPath = "./TestResults"
-)
-
-# Parse test results
-$unitTestResults = Get-ChildItem -Path $TestResultsPath -Filter "*unit*.trx" -Recurse
-$integrationTestResults = Get-ChildItem -Path $TestResultsPath -Filter "*integration*.trx" -Recurse
-
-# Calculate metrics
-$metrics = @{
-    TotalTests = 0
-    UnitTests = 0
-    IntegrationTests = 0
-    PassedTests = 0
-    FailedTests = 0
-    SkippedTests = 0
-    TotalDuration = 0
-    CodeCoverage = 0
-    Timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
-}
-
-# Process unit tests
-foreach ($result in $unitTestResults) {
-    [xml]$content = Get-Content $result.FullName
-    $counters = $content.TestRun.ResultSummary.Counters
-    
-    $metrics.UnitTests += [int]$counters.total
-    $metrics.PassedTests += [int]$counters.passed
-    $metrics.FailedTests += [int]$counters.failed
-    $metrics.SkippedTests += [int]$counters.notExecuted
-}
-
-# Process integration tests
-foreach ($result in $integrationTestResults) {
-    [xml]$content = Get-Content $result.FullName
-    $counters = $content.TestRun.ResultSummary.Counters
-    
-    $metrics.IntegrationTests += [int]$counters.total
-    $metrics.PassedTests += [int]$counters.passed
-    $metrics.FailedTests += [int]$counters.failed
-}
-
-$metrics.TotalTests = $metrics.UnitTests + $metrics.IntegrationTests
-
-# Calculate pyramid distribution
-$unitPercent = [math]::Round(($metrics.UnitTests / $metrics.TotalTests) * 100, 1)
-$intPercent = [math]::Round(($metrics.IntegrationTests / $metrics.TotalTests) * 100, 1)
-
-# Output JSON for dashboard
-$output = @{
-    Metrics = $metrics
-    Pyramid = @{
-        Unit = $unitPercent
-        Integration = $intPercent
-        UnitTarget = 60
-        IntegrationTarget = 30
-    }
-    Compliance = @{
-        PyramidCompliant = ($unitPercent -ge 55 -and $unitPercent -le 70 -and $intPercent -ge 25 -and $intPercent -le 35)
-        CoverageCompliant = $metrics.CodeCoverage -ge 80
-        AllTestsPassing = $metrics.FailedTests -eq 0
-    }
-}
-
-$output | ConvertTo-Json -Depth 5 | Out-File -FilePath "./test-metrics.json"
-
-Write-Host "✅ Metrics collected and saved to test-metrics.json"
-Write-Host "Test Pyramid: Unit=$unitPercent%, Integration=$intPercent%"
-```
-
-### Action Thresholds
-
-| Condition | Action Required | Owner | Timeline |
-|-----------|----------------|-------|----------|
-| Code coverage < 60% | Block PR, don't merge | Developer | Immediate |
-| Code coverage 60-79% | Add tests before merge | Developer | Within PR cycle |
-| Flaky test rate > 10% | Quarantine tests, investigate | QA Lead | Within 1 week |
-| Test pyramid off by > 20% | Review test strategy | Tech Lead | Within sprint |
-| Test execution > 10 min (unit) | Optimize or parallelize tests | DevOps | Within 2 weeks |
-| Defect escape rate > 10% | Review testing gaps | Team | Next retrospective |
-| 0 new tests for 2 sprints | Review DoD enforcement | Scrum Master | Immediate |
-
 ### Continuous Improvement
 
-**Monthly Review Questions:**
+**Review Questions (for Sprint/Retro?):**
 1. Are we maintaining 60-30-10 distribution?
 2. Is code coverage stable or improving?
 3. Are tests fast enough (< 5 min unit, < 15 min integration)?
 4. Are there patterns in escaped defects?
 5. Are flaky tests being addressed?
 6. Is test maintenance burden increasing?
-
-**Quarterly Goals:**
-- Reduce flaky test rate by 50%
-- Improve test execution time by 20%
-- Increase coverage by 5%
-- Reduce defect escape rate by 25%
 
 ---
 
@@ -1006,7 +755,7 @@ Write-Host "Test Pyramid: Unit=$unitPercent%, Integration=$intPercent%"
 **Success Criteria:**
 - ✅ All integration points have integration tests
 - ✅ Contract tests cover all API/message interfaces
-- ✅ Integration tests run post-deployment
+- ✅ Integration tests run post-/pre-deployment (can differ)
 - ✅ Test data management automated
 - ✅ Performance baselines established
 - ✅ < 5% flaky test rate
@@ -1016,12 +765,11 @@ Write-Host "Test Pyramid: Unit=$unitPercent%, Integration=$intPercent%"
 - [ ] Contract tests prevent breaking changes
 - [ ] Integration test execution time < 15 minutes
 - [ ] Automated test data setup/teardown
-- [ ] No integration defects in production for 3 months
 
 ---
 
-### Phase 3: Advanced Testing (Optional)
-**Focus:** Performance, chaos, security, resilience
+### Phase 3: Advanced/E2E Testing (Optional)
+**Focus:** E2E, performance, chaos, security, resilience
 
 **Entry Criteria:**
 - Phase 2 exit criteria met
@@ -1060,12 +808,11 @@ Write-Host "Test Pyramid: Unit=$unitPercent%, Integration=$intPercent%"
 - [ ] Azure resources available for integration tests
 - [ ] Test data strategy defined
 - [ ] Integration test tooling selected and configured
-- [ ] CI/CD pipeline supports post-deployment testing
+- [ ] TBD *CI/CD pipeline supports post-deployment testing*
 
 **Team Readiness:**
 - [ ] Team trained on integration testing practices
 - [ ] Team has written sample integration tests
-- [ ] Testing champions identified in each team
 - [ ] Documentation and examples available
 
 **Process Readiness:**
@@ -1722,8 +1469,6 @@ var order = new OrderBuilder()
 
 ## 9. Usage and Adoption
 
-### 9.1 How Teams Should Use This Standard
-
 **For New Projects:**
 1. Start with Phase 1 (Unit Testing)
 2. Set up project structure following folder conventions
@@ -1738,77 +1483,16 @@ var order = new OrderBuilder()
 4. Start with critical/high-risk components
 5. Incrementally improve coverage
 
-**Mandatory References:**
-- All teams must link to this file in their repo README
-- Include testing standards in onboarding documentation
-- Reference in PR templates and contribution guidelines
-- Use in architecture decision records (ADRs)
-
-### 9.2 Governance and Compliance
-
-**Review and Updates:**
-- This standard is owned by Architecture & Test Leads
-- Quarterly reviews for relevance and updates
-- Teams can propose changes via pull requests
-- Major changes require architecture review board approval
-
-**Compliance Checks:**
-- Monthly automated compliance scans
-- Quarterly manual audits
-- Pipeline gates enforce minimum standards
-- Non-compliance tracked and escalated
-
-**Metrics and Reporting:**
-- Test coverage dashboards (per project, per team)
-- Pipeline success rates
-- Defect escape rates
-- Testing maturity scorecard
-
-### 9.3 Support and Resources
-
-**Getting Help:**
-- Testing Community of Practice (weekly meetings)
-- Slack channel: #testing-standards
-- Office hours with test leads: Thursdays 2-4 PM
-- Internal wiki: confluence.company.com/testing
-
-**Training Resources:**
-- Unit Testing 101 (self-paced course)
-- Integration Testing Workshop (monthly)
-- Azure Testing Best Practices (quarterly)
-- Mob programming sessions (on-demand)
-
-**Templates and Tools:**
-- Project templates: GitHub template repositories
-- Test utilities: Internal NuGet feed
-- Pipeline templates: Shared Azure DevOps template library
-- Documentation: Confluence testing space
-
-### 9.4 Exceptions and Waivers
-
-**When to Request an Exception:**
-- Technical constraints prevent following standard
-- Legacy system with specific limitations
-- Temporary waiver during migration
-- Experimental/POC projects
-
-**Exception Process:**
-1. Document justification and risks
-2. Propose mitigation plan
-3. Submit to architecture review board
-4. Time-bound approval (max 6 months)
-5. Regular review and renewal required
-
 ---
 
 ## 10. Appendices
 
-### Appendix A: Glossary
+### Glossary
 
 | Term | Definition |
 |------|------------|
 | Unit Test | Test that verifies a single component in isolation with mocked dependencies |
-| Integration Test | Test that verifies interaction between multiple components with real Azure resources |
+| Integration Test | Test that verifies interaction between multiple components with/without real Azure resources |
 | Contract Test | Test that validates API/message schema compliance |
 | Flaky Test | Test that sometimes passes and sometimes fails without code changes |
 | Code Coverage | Percentage of code executed during test runs |
@@ -1817,7 +1501,7 @@ var order = new OrderBuilder()
 | Stub | Simplified implementation that returns predefined responses |
 | Assertion | Statement that verifies expected behavior in a test |
 
-### Appendix B: Useful Links
+### Useful Links
 
 - **Azure Testing Documentation:** https://learn.microsoft.com/azure/architecture/framework/devops/release-engineering-testing
 - **xUnit Documentation:** https://xunit.net/
@@ -1825,23 +1509,3 @@ var order = new OrderBuilder()
 - **Azure SDK Testing:** https://github.com/Azure/azure-sdk-for-net/tree/main/sdk/core/Azure.Core.TestFramework
 - **Martin Fowler - Testing:** https://martinfowler.com/testing/
 - **Test Pyramid:** https://martinfowler.com/articles/practical-test-pyramid.html
-
-### Appendix C: Version History
-
-| Version | Date | Changes | Author |
-|---------|------|---------|--------|
-| 1.0.0 | 2026-02-09 | Initial release | Architecture Team |
-
----
-
-## Document Control
-
-**Owner:** Architecture & Test Leads  
-**Review Frequency:** Quarterly  
-**Last Reviewed:** 2026-02-09  
-**Next Review:** 2026-05-09  
-**Status:** Active  
-
----
-
-**Questions or feedback?** Contact the testing team at testing-standards@company.com

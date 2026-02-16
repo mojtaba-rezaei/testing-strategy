@@ -1,0 +1,174 @@
+# Azure Pipeline - Unit Tests
+# This pipeline executes Phase 1 unit tests with code coverage reporting
+# Triggers on commits to main/develop branches when source code or unit tests change
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    include:
+      - 'src/**'
+      - 'tests/unit/**'
+    exclude:
+      - 'docs/**'
+      - '**/*.md'
+
+pr:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    include:
+      - 'src/**'
+      - 'tests/unit/**'
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  buildConfiguration: 'Release'
+  dotnetVersion: '8.x'
+  coverageThreshold: 80
+
+stages:
+  - stage: UnitTests
+    displayName: 'Unit Tests with Coverage'
+    jobs:
+      - job: RunUnitTests
+        displayName: 'Execute Unit Tests'
+        steps:
+          - task: UseDotNet@2
+            displayName: 'Install .NET $(dotnetVersion) SDK'
+            inputs:
+              version: '$(dotnetVersion)'
+              performMultiLevelLookup: true
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Restore NuGet Packages'
+            inputs:
+              command: 'restore'
+              projects: '**/*.UnitTests.csproj'
+              feedsToUse: 'select'
+              verbosityRestore: 'Minimal'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Build Unit Test Projects'
+            inputs:
+              command: 'build'
+              projects: '**/tests/unit/**/*.UnitTests.csproj'
+              arguments: '--configuration $(buildConfiguration) --no-restore'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Run Unit Tests with Coverage'
+            inputs:
+              command: 'test'
+              projects: '**/tests/unit/**/*.UnitTests.csproj'
+              arguments: >-
+                --configuration $(buildConfiguration)
+                --no-build
+                --no-restore
+                --collect:"XPlat Code Coverage"
+                --logger trx
+                --results-directory $(Agent.TempDirectory)/TestResults
+                /p:CollectCoverage=true
+                /p:CoverletOutputFormat=cobertura
+                /p:Threshold=$(coverageThreshold)
+                /p:ThresholdType=line
+              publishTestResults: true
+            continueOnError: false
+
+          - task: PublishTestResults@2
+            displayName: 'Publish Test Results'
+            inputs:
+              testResultsFormat: 'VSTest'
+              testResultsFiles: '$(Agent.TempDirectory)/TestResults/**/*.trx'
+              mergeTestResults: true
+              failTaskOnFailedTests: true
+              testRunTitle: 'Unit Tests - $(Build.BuildNumber)'
+            condition: succeededOrFailed()
+
+          - task: PublishCodeCoverageResults@1
+            displayName: 'Publish Code Coverage Report'
+            inputs:
+              codeCoverageTool: 'Cobertura'
+              summaryFileLocation: '$(Agent.TempDirectory)/TestResults/**/coverage.cobertura.xml'
+              pathToSources: '$(Build.SourcesDirectory)/src'
+              reportDirectory: '$(Agent.TempDirectory)/CoverageReport'
+              failIfCoverageEmpty: true
+            condition: succeededOrFailed()
+
+          - script: |
+              echo "Installing ReportGenerator tool..."
+              dotnet tool install -g dotnet-reportgenerator-globaltool
+              echo "Generating coverage report..."
+              reportgenerator \
+                -reports:$(Agent.TempDirectory)/TestResults/**/coverage.cobertura.xml \
+                -targetdir:$(Agent.TempDirectory)/CoverageReport \
+                -reporttypes:HtmlInline_AzurePipelines
+            displayName: 'Generate Coverage HTML Report'
+            condition: succeededOrFailed()
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish Coverage HTML Report'
+            inputs:
+              PathtoPublish: '$(Agent.TempDirectory)/CoverageReport'
+              ArtifactName: 'CodeCoverage-UnitTests'
+              publishLocation: 'Container'
+            condition: succeededOrFailed()
+
+          - script: |
+              echo "Checking coverage threshold..."
+              COVERAGE_FILE=$(find $(Agent.TempDirectory)/TestResults -name 'coverage.cobertura.xml' | head -1)
+              if [ -z "$COVERAGE_FILE" ]; then
+                echo "##vso[task.logissue type=error]Coverage file not found!"
+                exit 1
+              fi
+              
+              # Extract line coverage percentage
+              COVERAGE=$(grep -oP 'line-rate="\K[^"]*' "$COVERAGE_FILE" | head -1)
+              COVERAGE_PERCENT=$(echo "$COVERAGE * 100" | bc)
+              COVERAGE_INT=${COVERAGE_PERCENT%.*}
+              
+              echo "##vso[task.setvariable variable=LineCoverage]$COVERAGE_INT"
+              echo "Line Coverage: $COVERAGE_INT%"
+              
+              if [ "$COVERAGE_INT" -lt "$(coverageThreshold)" ]; then
+                echo "##vso[task.logissue type=error]Coverage ($COVERAGE_INT%) is below threshold ($(coverageThreshold)%)"
+                exit 1
+              else
+                echo "##vso[task.complete result=Succeeded;]Coverage threshold met: $COVERAGE_INT%"
+              fi
+            displayName: 'Validate Coverage Threshold'
+            condition: succeeded()
+
+          - script: |
+              echo "=========================================="
+              echo "Unit Test Summary"
+              echo "=========================================="
+              echo "Build Number: $(Build.BuildNumber)"
+              echo "Branch: $(Build.SourceBranch)"
+              echo "Commit: $(Build.SourceVersion)"
+              echo "Line Coverage: $(LineCoverage)%"
+              echo "Threshold: $(coverageThreshold)%"
+              echo "Status: PASSED ✅"
+              echo "=========================================="
+            displayName: 'Print Test Summary'
+            condition: succeeded()
+
+# Optional: Send notification on failure
+# Uncomment and configure if you have Teams/Slack webhook
+# - task: PowerShell@2
+#   displayName: 'Notify on Failure'
+#   inputs:
+#     targetType: 'inline'
+#     script: |
+#       $webhookUrl = "$(TEAMS_WEBHOOK_URL)"
+#       $body = @{
+#         text = "❌ Unit Tests Failed - Build $(Build.BuildNumber)"
+#         title = "Pipeline Failure Alert"
+#       } | ConvertTo-Json
+#       Invoke-RestMethod -Uri $webhookUrl -Method Post -Body $body -ContentType 'application/json'
+#   condition: failed()

@@ -18,29 +18,61 @@ This testing strategy defines a **phased, incremental approach** to automation t
 
 ```
 .
-├── README.md                           # This file
-├── AUTOMATION_TESTING_STANDARD.md      # Complete testing standard (single source of truth)
-├── DIAGRAMS.md                         # Visual architecture diagrams and guides
-├── PLAN.md                             # Implementation plan
-├── INSTRUCTION.md                      # Original requirements
-├── QUICK_START.md                      # Getting started guide
-├── CONTRIBUTING.md                     # How to contribute to this standard
-├── MATURITY_ASSESSMENT.md              # Self-assessment checklist
-├── SUMMARY.md                          # Complete implementation summary
-└── samples/                            # Sample projects with working code
-    ├── README.md                       # Samples overview
-    └── OrderProcessingFunction/        # Azure Function sample (.NET 8)
+├── .ai/                                      # AI-generated content and prompts
+│   ├── README.md                             # AI folder overview
+│   ├── generation-log.md                     # AI generation history
+│   └── prompts/
+│       ├── testing-strategy-prompt.md        # Original strategy prompt
+│       └── unit-test-generator.md            # ⭐ AI agent test generation guide
+│
+├── samples/
+│   ├── OrderProcessingFunction/              # Azure Function sample (.NET 8)
+│   ├── pipelines/                            # CI/CD pipeline examples
+│   │   ├── README.md                         # Pipelines guide
+│   │   ├── azure-pipelines-unit-tests.yml    # Azure Pipelines unit tests
+│   │   └── azure-pipelines-integration-tests.yml  # Azure Pipelines integration
+│   └── .github/
+│       └── workflows/                            # GitHub Actions workflows
+│           ├── README.md                         # Workflows guide
+│           ├── unit-tests.yml                    # Unit test workflow
+│           └── integration-tests.yml             # Integration test workflow
+│
+├── architecture/
+│   └── docs/                                 # Architecture documentation
+│       ├── AUTOMATION_TESTING_STANDARD.md    # Core principles and architecture
+│       ├── NAMING_CONVENTIONS.md             # Naming standards and patterns
+│       ├── PHASE_1_UNIT_TESTING.md           # Phase 1 complete guide
+│       ├── PHASE_2_INTEGRATION_TESTING.md    # Phase 2 complete guide
+│       ├── PLAN.md                           # Implementation plan
+│       ├── MATURITY_ASSESSMENT.md            # Self-assessment checklist
+│       └── SUMMARY.md                        # Complete implementation summary
+│
+├── README.md                                 # This file
+└── QUICK_START.md                            # Getting started guide
 ```
 
 ## Quick Links
 
-- **📘 [Full Testing Standard](AUTOMATION_TESTING_STANDARD.md)** - Complete reference
+### Core Documentation
+- **📘 [Testing Standard](architecture/docs/AUTOMATION_TESTING_STANDARD.md)** - Core principles and architecture
 - **🚀 [Quick Start Guide](QUICK_START.md)** - Get started in 5 minutes
-- **📊 [Visual Diagrams](DIAGRAMS.md)** - Architecture diagrams and visual guides
+- **📋 [Implementation Plan](architecture/docs/PLAN.md)** - Rollout strategy
+- **📈 [Maturity Assessment](architecture/docs/MATURITY_ASSESSMENT.md)** - Self-assessment tool
+
+### Phase-Specific Guides
+- **🔷 [Phase 1: Unit Testing](architecture/docs/PHASE_1_UNIT_TESTING.md)** - Complete unit testing guide
+- **🔶 [Phase 2: Integration Testing](architecture/docs/PHASE_2_INTEGRATION_TESTING.md)** - Complete integration testing guide
+- **📝 [Naming Conventions](architecture/docs/NAMING_CONVENTIONS.md)** - All naming standards
+
+### AI & Automation
+- **🤖 [AI Prompts & Tools](.ai/prompts/)** - AI agent instructions
+- **⚡ [Unit Test Generator](.ai/prompts/unit-test-generator.md)** - AI-powered test generation guide
+- **📜 [Generation Log](.ai/generation-log.md)** - AI content history
+
+### CI/CD Examples
+- **🔧 [GitHub Actions Workflows](samples/.github/workflows/)** - Unit + Integration workflows
+- **🔧 [Azure Pipelines](samples/pipelines/)** - Unit + Integration pipelines
 - **📂 [Sample Projects](samples/)** - Working code examples (.NET 8)
-- **📋 [Implementation Plan](PLAN.md)** - Rollout strategy
-- **📈 [Maturity Assessment](MATURITY_ASSESSMENT.md)** - Self-assessment tool
-- **🤝 [Contributing](CONTRIBUTING.md)** - Propose improvements
 
 ## Testing Maturity Phases
 
@@ -64,33 +96,81 @@ This testing strategy defines a **phased, incremental approach** to automation t
 ## Getting Started
 
 ### For New Projects
-Explore the [Sample Projects](samples/) for working examples
-3. Copy sample structure to your project
-4. Set up CI pipeline using examples from the standard
-5. Use the project templates from `/templates`
-3. Set up CI pipeline using `/pipelines` examples
-4. Achieve Phase 1 compliance
+
+1. **Read the documentation:**
+   - Start with [QUICK_START.md](QUICK_START.md)
+   - Review [AUTOMATION_TESTING_STANDARD.md](architecture/docs/AUTOMATION_TESTING_STANDARD.md)
+   - Deep dive into [PHASE_1_UNIT_TESTING.md](architecture/docs/PHASE_1_UNIT_TESTING.md)
+
+2. **Set up your project:**
+   - Copy the [sample project structure](samples/OrderProcessingFunction/)
+   - Apply [NAMING_CONVENTIONS.md](architecture/docs/NAMING_CONVENTIONS.md)
+   - Follow the Test Builder pattern
+
+3. **Set up CI/CD:**
+   - **For GitHub:** Copy [samples/.github/workflows/unit-tests.yml](samples/.github/workflows/unit-tests.yml)
+   - **For Azure DevOps:** Copy [samples/pipelines/azure-pipelines-unit-tests.yml](samples/pipelines/azure-pipelines-unit-tests.yml)
+   - Configure secrets and variables as per README files
+
+4. **Generate tests with AI:**
+   - Use [.ai/prompts/unit-test-generator.md](.ai/prompts/unit-test-generator.md) with your AI assistant
+   - Provide the prompt to ChatGPT, GitHub Copilot, or Claude
+   - Get deterministic, standards-compliant unit tests
+
+5. **Achieve Phase 1 compliance:**
+   - 80% code coverage
+   - All tests passing in CI
+   - Follow naming conventions
 
 ### For Existing Projects
 
-1. Review [AUTOMATION_TESTING_STANDARD.md](AUTOMATION_TESTING_STANDARD.md)
-2. Complete the maturity self-assessment
-3. Create gap analysis and adoption plan
-4. Start with high-risk/critical components
-5. Track progress against Phase 1 exit criteria
+1. **Assess current state:**
+   - Complete [MATURITY_ASSESSMENT.md](architecture/docs/MATURITY_ASSESSMENT.md)
+   - Identify gaps
+
+2. **Plan adoption:**
+   - Review [PLAN.md](architecture/docs/PLAN.md)
+   - Prioritize high-risk components
+   - Create sprint-level tasks
+
+3. **Implement incrementally:**
+   - Start with [PHASE_1_UNIT_TESTING.md](architecture/docs/PHASE_1_UNIT_TESTING.md)
+   - Use [.ai/prompts/unit-test-generator.md](.ai/prompts/unit-test-generator.md) to speed up test creation
+   - Set up CI/CD early (use the provided examples)
+
+4. **Track progress:**
+   - Monitor coverage in CI/CD dashboards
+   - Review against Phase 1 exit criteria
+   - Plan Phase 2 adoption
+
+### Using AI to Generate Tests
+
+**🤖 NEW: AI-Powered Test Generation**
+
+This repository includes comprehensive AI agent instructions for generating standards-compliant unit tests:
+
+1. **Open your AI assistant** (ChatGPT, GitHub Copilot Chat, Claude)
+2. **Load the prompt:** Copy content from [.ai/prompts/unit-test-generator.md](.ai/prompts/unit-test-generator.md)
+3. **Provide your source code:** Paste the class you want to test
+4. **Get production-ready tests:** The AI will generate full test classes following all conventions
+
+**What you get:**
+- ✅ Correct naming (MethodName_Scenario_ExpectedBehavior)
+- ✅ AAA pattern (Arrange-Act-Assert)
+- ✅ Proper mocking (Moq) and assertions (FluentAssertions)
+- ✅ Test Builder pattern
+- ✅ >80% coverage guidance
+- ✅ CI/CD compatible tests
+
+See [.ai/README.md](.ai/README.md) for more details.
 
 ## Scope
 
 This standard applies to all projects using:
 
-- ✅ Azure Logic Apps (Standard & Consumption)
 - ✅ Azure Functions
-- ✅ Azure Service Bus
-- ✅ Azure Event Grid / Event Hubs
-- ✅ Azure API Management
+- ✅ Azure Logic Apps Standard
 - ✅ Azure Data Factory
-- ✅ Azure Storage
-- ✅ Custom integration components
 
 ## Key Standards at a Glance
 
@@ -103,37 +183,8 @@ This standard applies to all projects using:
 | **Pipeline Gates** | All tests pass, coverage threshold met |
 | **Definition of Done** | Tests written, reviewed, and passing in CI |
 
-## Support
-
-- **Community:** #testing-standards Slack channel
-- **Office Hours:** Thursdays 2-4 PM with Test Leads
-- **Training:** Monthly workshops and self-paced courses
-- **Questions:** testing-standards@company.com
-
 ## Compliance
 
 - ✅ All new projects must follow this standard
-- ✅ Existing projects: 12-month adoption timeline
-- ✅ Quarterly compliance audits
+- ✅ Existing projects: adoption overtime
 - ✅ Pipeline gates enforce standards automatically
-
-## Contributing
-
-We welcome improvements to this standard! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
-- How to propose changes
-- Change review process
-- Update approval workflow
-
-## Version
-
-**Current Version:** 1.0.0  
-**Last Updated:** February 9, 2026  
-**Next Review:** May 9, 2026
-
-## License
-
-Internal use only - Proprietary to [Company Name]
-
----
-
-**Need help?** Start with the [Quick Start Guide](QUICK_START.md) or join our Slack channel #testing-standards
