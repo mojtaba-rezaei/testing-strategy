@@ -58,6 +58,10 @@ Generated\ Files/
 TestResult.xml
 nunit-*.xml
 
+# Test output directories
+TestResults/
+coveragereport/
+
 # Approval Tests result files
 *.received.*
 

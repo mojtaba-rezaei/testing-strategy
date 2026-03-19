@@ -651,6 +651,17 @@ graph TD
   - Optimize slow integration tests
   - Parallelize test execution where possible
 
+### AI-Assisted Test Development
+- **Workspace Cleanup:**
+  - When using AI agents (e.g., GitHub Copilot, coding assistants) to generate tests, ensure all temporary artifacts are cleaned up before marking tasks complete
+  - Remove local test reports generated for validation (e.g., `TestResults/`, `coveragereport/`, `Summary.txt`)
+  - Delete temporary coverage files created during iterative development
+  - Commit only source code and essential configuration — not agent-generated validation artifacts
+- **Version Control Hygiene:**
+  - Add temporary report directories to `.gitignore` if not already present
+  - Review staged changes before committing to avoid accidental inclusion of temp files
+  - Keep the workspace clean for the next developer or agent session
+
 ---
 
 ## 6.5 Test Metrics and Key Performance Indicators (KPIs)

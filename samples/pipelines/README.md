@@ -369,6 +369,7 @@ services:
 3. **Conditional Execution:** Skip integration tests for documentation-only changes
 4. **Secret Management:** Store connection strings in Azure Key Vault, reference in pipeline
 5. **Test Categorization:** Use `[Trait("Category", "Integration")]` to filter tests
+6. **Workspace Cleanup:** When using AI agents for test development, remove all temporary test reports (`TestResults/`, `coveragereport/`, `Summary.txt`) before committing — these are validation artifacts, not source code
 
 ## Related Documentation
 

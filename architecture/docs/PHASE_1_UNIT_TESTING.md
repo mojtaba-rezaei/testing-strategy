@@ -1095,6 +1095,34 @@ _orderRepositoryMock.Setup(r => r.SaveAsync(It.IsAny<Order>()));
 var mockString = new Mock<string>(); // Don't do this
 ```
 
+### AI-Assisted Test Development
+
+When using AI coding agents (e.g., GitHub Copilot, AI assistants) to generate tests:
+
+**Workspace Cleanup:**
+```bash
+# ✅ Good - Clean up before committing
+rm -rf TestResults/
+rm -rf coveragereport/
+git status  # Verify no temp files staged
+
+# ❌ Bad - Committing agent validation artifacts
+git add TestResults/  # Don't commit temp reports
+```
+
+**Best Practices:**
+- Remove all local test reports generated for validation (`TestResults/`, `coveragereport/`, `Summary.txt`)
+- Delete temporary coverage files created during iterative development
+- Review staged changes to avoid accidental inclusion of temporary files
+- Add temp directories to `.gitignore` if not already present
+- Commit only source code and essential configuration files
+
+**Why This Matters:**
+- Keeps the repository clean and focused
+- Prevents merge conflicts on auto-generated files
+- Reduces repository size
+- Maintains professional code hygiene
+
 ## Common Pitfalls (Phase 1)
 
 | Pitfall | Impact | Solution |
