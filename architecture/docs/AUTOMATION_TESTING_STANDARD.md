@@ -463,6 +463,17 @@ graph TD
   - Code coverage reports
   - Test result files (TRX, JUnit XML)
 
+#### Known Azure DevOps Pipeline Pitfalls
+
+> These are real issues encountered during implementation. See [pipelines/README.md](../../samples/pipelines/README.md#troubleshooting) for detailed solutions.
+
+| Pitfall | Impact | Solution |
+|---------|--------|----------|
+| `--collect:"XPlat Code Coverage"` in `DotNetCoreCLI@2` | Quotes stripped by YAML, breaks `dotnet test` argument parsing | Use a `.runsettings` file with `--settings` instead |
+| `publishTestResults: true` (default) | Auto-injects `--logger trx` and `--results-directory`, causes duplicates if you also specify them | Set `publishTestResults: false`, use separate `PublishTestResults@2` task |
+| `dotnet test` with private NuGet feeds | Implicit restore only uses nuget.org, fails to find private packages | Add `--no-restore`, run explicit restore step with `vstsFeed` first |
+| Service connection references on feature branches | Azure DevOps validates all service connections at **compile time**, even in stages with runtime `condition:` | Use compile-time `${{ if }}` expressions to exclude deployment stages on branches without variable groups |
+
 ### Step 2 — Integration Testing Pipeline
 - **Trigger:** Every PR to test (if possible prod too) environment
 - **Prerequisites:** Unit tests passed, deployment successful
@@ -508,10 +519,20 @@ graph TD
       /lib
   /tests
     /unit
+      test.runsettings                    ← Code coverage config (for Azure DevOps)
       /FunctionApp1.UnitTests
         /Functions
+          /<IntegrationId>                ← One subfolder per integration/function
+            HappyPathTests.cs             ← Category-based test classes
+            ErrorHandlingTests.cs
+            FilteringRulesTests.cs
+            EdgeCaseTests.cs
+            /TestData                     ← Large sample data constants
+              SampleData.cs
         /Services
         /Models
+        /Helpers                          ← Shared test utilities (XML builders, etc.)
+          TestHelper.cs
       /LogicApp1.UnitTests
         /lib
     /integration

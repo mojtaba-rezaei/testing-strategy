@@ -36,22 +36,37 @@ Before generating tests, analyze the codebase structure:
 ├── src/
 │   └── <ProjectName>.FunctionApp/          # Azure Functions project
 │       ├── Functions/                       # HTTP/Timer/Queue triggered functions
+│       │   ├── <IntegrationId>/             # Per-integration subfolder (e.g., OrderImport)
+│       │   │   └── MyFunction.cs
+│       │   └── <IntegrationId>/
 │       ├── Services/                        # Business logic services
 │       ├── Models/                          # DTOs, domain models
 │       └── Infrastructure/                  # Azure SDK clients, repositories
 └── tests/
     └── unit/
+        ├── test.runsettings                 # Code coverage config (for Azure DevOps CI/CD)
         └── <ProjectName>.UnitTests/         # Unit test project (THIS IS YOUR OUTPUT)
             ├── Functions/                   # Test classes for Functions/
+            │   └── <IntegrationId>/         # Mirror source subfolder structure
+            │       ├── HappyPathTests.cs    # Category-based split (not #region blocks)
+            │       ├── ErrorHandlingTests.cs
+            │       ├── FilteringRulesTests.cs
+            │       ├── EdgeCaseTests.cs
+            │       └── TestData/            # Large XML/JSON sample constants
+            │           └── SampleData.cs
             ├── Services/                    # Test classes for Services/
             ├── Models/                      # Test classes for Models/
-            ├── Builders/                    # Test data builders
-            └── Infrastructure/              # Test classes for Infrastructure/
+            ├── Helpers/                     # Shared test utilities (XML builders, request helpers)
+            │   └── TestHelper.cs
+            └── Builders/                    # Test data builders (Builder pattern)
 ```
 
 **Key Identification Rules:**
 - Scan `src/` to find the main project (typically `*.FunctionApp.csproj`)
 - Identify all classes in `Functions/`, `Services/`, `Models/` folders
+- **Mirror subfolder structure:** If source has `Functions/OrderImport/`, create `Functions/OrderImport/` in tests
+- **Split by category:** When a function has many tests (>15), split eg. into `HappyPathTests`, `ErrorHandlingTests`, `FilteringRulesTests`, `EdgeCaseTests` — NOT `#region` blocks
+- **Extract large data:** Store large XML/JSON sample constants in `TestData/SampleData.cs` to keep test classes clean
 - Check for existing `Builders/` folder in tests - reuse existing builders
 - Verify test project naming: `<ProjectName>.UnitTests.csproj`
 

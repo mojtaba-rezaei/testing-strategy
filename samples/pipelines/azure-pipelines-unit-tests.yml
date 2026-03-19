@@ -70,14 +70,10 @@ stages:
                 --configuration $(buildConfiguration)
                 --no-build
                 --no-restore
-                --collect:"XPlat Code Coverage"
+                --settings tests/unit/test.runsettings
                 --logger trx
                 --results-directory $(Agent.TempDirectory)/TestResults
-                /p:CollectCoverage=true
-                /p:CoverletOutputFormat=cobertura
-                /p:Threshold=$(coverageThreshold)
-                /p:ThresholdType=line
-              publishTestResults: true
+              publishTestResults: false
             continueOnError: false
 
           - task: PublishTestResults@2

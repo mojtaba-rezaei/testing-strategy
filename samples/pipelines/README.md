@@ -129,11 +129,13 @@ variables:
 **Unit Tests:** 80% minimum (configurable in YAML)
 
 ```yaml
-# In azure-pipelines-unit-tests.yml
+# Use a .runsettings file for code coverage (see Troubleshooting for why)
 - script: |
-    dotnet test --collect:"XPlat Code Coverage" /p:Threshold=80
-  displayName: 'Run Unit Tests with 80% coverage requirement'
+    dotnet test --settings tests/unit/test.runsettings
+  displayName: 'Run Unit Tests with coverage'
 ```
+
+> **Note:** Do NOT use `--collect:"XPlat Code Coverage"` in `DotNetCoreCLI@2` task arguments. See the [Troubleshooting](#issue-collectxplat-code-coverage-breaks-in-azure-devops) section for details.
 
 **Integration Tests:** No coverage enforcement (focus on E2E scenarios)
 
@@ -197,6 +199,122 @@ projects: '**/tests/unit/**/*.UnitTests.csproj'
 dotnet test --collect:"XPlat Code Coverage"
 reportgenerator -reports:**/coverage.cobertura.xml -targetdir:coveragereport
 ```
+
+### Issue: `--collect:"XPlat Code Coverage"` breaks in Azure DevOps
+**Symptom:** `dotnet test` fails with argument parsing errors like `Unrecognized command or argument 'Code'` or `Unrecognized command or argument 'Coverage"'`.
+
+**Root Cause:** The `DotNetCoreCLI@2` task (and YAML processing) strips the surrounding quotes from `--collect:"XPlat Code Coverage"`, turning it into three separate tokens: `--collect:XPlat`, `Code`, `Coverage`. This corrupts the `dotnet test` command.
+
+**Solution:** Use a `.runsettings` file instead of the `--collect` argument:
+
+1. Create `tests/unit/test.runsettings`:
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat Code Coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>
+```
+
+2. Reference it in the pipeline:
+```yaml
+- task: DotNetCoreCLI@2
+  displayName: 'Run Unit Tests with Coverage'
+  inputs:
+    command: 'test'
+    projects: '**/tests/unit/**/*.UnitTests.csproj'
+    arguments: '--configuration $(buildConfiguration) --no-build --no-restore --settings tests/unit/test.runsettings --logger trx --results-directory $(Agent.TempDirectory)/TestResults'
+    publishTestResults: false
+```
+
+> **Note:** This is a known limitation of the `DotNetCoreCLI@2` task. The `.runsettings` approach is more reliable and also allows configuring additional coverage options (exclusions, formats, etc.) without modifying the pipeline YAML.
+
+### Issue: Duplicate `--logger` and `--results-directory` arguments
+**Symptom:** `dotnet test` fails because it receives duplicate `--logger trx` or `--results-directory` arguments.
+
+**Root Cause:** When `publishTestResults` is set to `true` (the default), the `DotNetCoreCLI@2` task automatically injects `--logger trx` and `--results-directory` arguments. If you also specify them in the `arguments` field, they appear twice.
+
+**Solution:** Set `publishTestResults: false` and use a separate `PublishTestResults@2` task:
+```yaml
+- task: DotNetCoreCLI@2
+  displayName: 'Run Unit Tests'
+  inputs:
+    command: 'test'
+    projects: '**/tests/unit/**/*.UnitTests.csproj'
+    arguments: '--no-build --no-restore --logger trx --results-directory $(Agent.TempDirectory)/TestResults'
+    publishTestResults: false  # Prevents auto-injected arguments
+
+- task: PublishTestResults@2
+  displayName: 'Publish Test Results'
+  inputs:
+    testResultsFormat: 'VSTest'
+    testResultsFiles: '$(Agent.TempDirectory)/TestResults/**/*.trx'
+    mergeTestResults: true
+    failTaskOnFailedTests: true
+  condition: succeededOrFailed()
+```
+
+### Issue: NuGet restore fails for private feed packages during `dotnet test`
+**Symptom:** `dotnet test` fails with errors like `error NU1101: Unable to find package <PackageName>. No packages exist with this id in source(s): nuget.org`.
+
+**Root Cause:** `dotnet test` performs an implicit restore that only uses `nuget.org`. If your project references packages from a private Azure DevOps Artifacts feed, the implicit restore won't find them.
+
+**Solution:** Add `--no-restore` to the test arguments and ensure a proper restore step runs beforehand with the private feed configured:
+```yaml
+# 1. Authenticate with private feed
+- task: NuGetAuthenticate@1
+  displayName: 'Authenticate NuGet'
+
+# 2. Restore with private feed
+- task: DotNetCoreCLI@2
+  displayName: 'Restore NuGet Packages'
+  inputs:
+    command: 'restore'
+    projects: '**/*.UnitTests.csproj'
+    feedsToUse: 'select'
+    vstsFeed: '<your-feed-id>'
+
+# 3. Test with --no-restore
+- task: DotNetCoreCLI@2
+  displayName: 'Run Unit Tests'
+  inputs:
+    command: 'test'
+    projects: '**/*.UnitTests.csproj'
+    arguments: '--no-build --no-restore'
+    publishTestResults: true
+```
+
+### Issue: Service connection validation fails on feature branches
+**Symptom:** Pipeline fails at compile time with `There was a resource authorization problem` or service connection variable not found, even though the stage would never run on that branch.
+
+**Root Cause:** Azure DevOps validates **all** service connection references at pipeline compile time, regardless of runtime conditions (`condition:`). If a deployment stage references a service connection via a variable group that only loads for specific branches (e.g., `main`, `release/*`), pipelines triggered from `feature/*` branches will fail because the variable group isn't loaded.
+
+**Solution:** Use compile-time `${{ if }}` expressions instead of runtime `condition:` to conditionally include deployment stages:
+```yaml
+# BAD: Runtime condition - service connection still validated at compile time
+- stage: DeployDev
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/dev'))
+  jobs:
+    - deployment: Deploy
+      environment: 'dev'
+      # Uses $(serviceConnection) from a variable group only loaded for 'dev' branch
+
+# GOOD: Compile-time expression - stage excluded entirely for non-matching branches
+- ${{ if eq(variables['Build.SourceBranchName'], 'dev') }}:
+  - stage: DeployDev
+    jobs:
+      - deployment: Deploy
+        environment: 'dev'
+```
+
+> **Important:** The `${{ if }}` expression must match the same branch conditions as your variable group loading logic. If variable groups load for `dev`, `release/*`, `main`, etc., each deployment stage must be wrapped in a corresponding `${{ if }}` expression.
 
 ### Issue: "Azurite not starting"
 **Solution:** Ensure Docker service is available:

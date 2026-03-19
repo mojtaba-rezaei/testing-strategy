@@ -264,6 +264,48 @@ public class OrderServiceTests
 }
 ```
 
+### Category-Based Test Classes (Recommended for Large Functions)
+
+When a function or class has many test cases across different concerns, split `#region` blocks into separate classes organized by test category. Each class lives in a subfolder matching the source function/integration ID.
+
+**Pattern:** `<Category>Tests` in namespace `<Project>.UnitTests.<SourceFolder>.<IntegrationId>`
+
+**Standard categories:**
+- `HappyPathTests` — Valid input, expected output, core mapping validation
+- `ErrorHandlingTests` — Invalid input, malformed data, missing fields
+- `FilteringRulesTests` — Business rules that exclude/skip records
+- `EdgeCaseTests` — Boundary values, optional fields, default values
+
+**Example:**
+```csharp
+// File: Functions/OrderImport/HappyPathTests.cs
+namespace MyProject.UnitTests.Functions.OrderImport;
+
+public class HappyPathTests
+{
+    private readonly XmlToCanonicalFunction _sut = new();
+
+    [Fact]
+    public async Task Run_WhenValidXmlInput_ShouldReturn200() { }
+
+    [Fact]
+    public async Task Run_WhenValidXmlInput_ShouldMapHeaderFieldsCorrectly() { }
+}
+
+// File: Functions/OrderImport/ErrorHandlingTests.cs
+namespace MyProject.UnitTests.Functions.OrderImport;
+
+public class ErrorHandlingTests
+{
+    private readonly XmlToCanonicalFunction _sut = new();
+
+    [Fact]
+    public async Task Run_WhenInvalidXml_ShouldReturn400() { }
+}
+```
+
+> **When to use this pattern:** When a single test class would exceed ~15-20 tests, or when tests naturally group into distinct categories (happy path, error handling, filtering, edge cases). Prefer this over `#region` blocks — separate files provide better navigation and cleaner diffs.
+
 ## Test Builder Naming
 
 ### Pattern
@@ -429,6 +471,8 @@ namespace TestUtilities.Builders
 
 ## Folder Structure Naming
 
+### Simple Projects (Single Function/Service)
+
 ```
 /tests
   /unit
@@ -455,6 +499,46 @@ namespace TestUtilities.Builders
       /Builders
       /Fixtures
       /Helpers
+```
+
+### Multi-Integration Projects (Multiple Functions)
+
+When the source project has multiple functions/integrations (e.g., `OrderImport`, `OrderExport`), mirror that structure in the test project. Use category-based test classes within each subfolder.
+
+```
+/tests
+  /unit
+    test.runsettings                ← Code coverage config (for Azure DevOps)
+    /<ProjectName>.UnitTests
+      /Functions
+        /OrderImport                ← Mirrors src Functions/OrderImport/
+          HappyPathTests.cs
+          ErrorHandlingTests.cs
+          FilteringRulesTests.cs
+          EdgeCaseTests.cs
+          /TestData                  ← Large sample data constants
+            SampleData.cs            ← XML/JSON input samples, shared deserialization helpers
+        /OrderExport                ← Mirrors src Functions/OrderExport/
+          HappyPathTests.cs
+          ErrorHandlingTests.cs
+          /TestData
+            SampleData.cs
+      /Helpers                       ← Shared test utilities (XML builders, request helpers)
+        TestHelper.cs
+```
+
+**TestData classes** store large constants (sample XML, JSON payloads) and shared deserialization helpers to keep test classes clean and focused on assertions:
+
+```csharp
+// File: Functions/OrderImport/TestData/SampleData.cs
+namespace MyProject.UnitTests.Functions.OrderImport.TestData;
+
+internal static class SampleData
+{
+    internal const string ValidInputXml = """...""";
+
+    internal static MyModel DeserializeResult(IActionResult result) { ... }
+}
 ```
 
 ## Variable Naming in Tests

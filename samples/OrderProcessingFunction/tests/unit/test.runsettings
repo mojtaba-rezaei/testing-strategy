@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+  Code coverage configuration for Azure DevOps Pipelines.
+  
+  WHY: The --collect:"XPlat Code Coverage" CLI argument breaks in DotNetCoreCLI@2 tasks
+  because Azure DevOps YAML processing strips the quotes, turning it into separate tokens.
+  Using a .runsettings file avoids this issue entirely.
+  
+  USAGE: dotnet test --settings tests/unit/test.runsettings
+-->
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat Code Coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

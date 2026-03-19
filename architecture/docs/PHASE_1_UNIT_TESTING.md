@@ -104,6 +104,10 @@ In Phase 1, you'll build the foundation of the test pyramid:
 - Mock dependencies (services, repositories)
 - Use dependency injection for testability
 
+#### Pattern A: Functions with DI Dependencies
+
+When the function has constructor-injected dependencies, mock them:
+
 **Example:**
 ```csharp
 public class ProcessOrderTests
@@ -134,6 +138,61 @@ public class ProcessOrderTests
     }
 }
 ```
+
+#### Pattern B: Stateless Functions (No DI Dependencies)
+
+Many integration functions (e.g., XML-to-JSON mapping, data transformations) are stateless and have no constructor dependencies. These can be instantiated directly without mocks. The focus is on testing the transformation logic with real input/output data.
+
+**Example:**
+```csharp
+public class XmlToCanonicalFunctionTests
+{
+    private readonly XmlToCanonicalFunction _sut = new();
+
+    [Fact]
+    public async Task Run_WithValidXml_ReturnsOkWithMappedJson()
+    {
+        // Arrange
+        var xml = TestHelper.BuildMinimalValidXml(
+            sourceParty: "WAREHOUSE01",
+            destinationParty: "STORE001",
+            referenceNumber: "REF-123");
+        var request = TestHelper.CreateHttpRequest(xml);
+
+        // Act
+        var response = await _sut.Run(request);
+
+        // Assert
+        response.Should().BeOfType<OkObjectResult>();
+        var result = DeserializeResult(response);
+        result.Header.SourceParty.Should().Be("WAREHOUSE01");
+        result.Header.DestinationParty.Should().Be("STORE001");
+    }
+
+    [Fact]
+    public async Task Run_WithEmptyBody_ReturnsBadRequest()
+    {
+        // Arrange
+        var request = TestHelper.CreateHttpRequest("");
+
+        // Act
+        var response = await _sut.Run(request);
+
+        // Assert
+        response.Should().BeOfType<BadRequestObjectResult>();
+    }
+}
+```
+
+**Key points for stateless function tests:**
+- **No mocks needed** - instantiate the function class directly (`new()`)
+- **Focus on input/output mapping** - validate that XML/JSON/CSV transformations produce correct output
+- **Use helper methods** for building test data (e.g., `TestHelper.BuildMinimalValidXml()`) to keep tests readable
+- **Test filtering rules** - verify that invalid/excluded records are correctly filtered out
+- **Test edge cases** - empty collections, missing optional fields, boundary values
+
+> **Gotcha: Serializer behavior with empty collections**
+> Some serialization libraries (e.g., custom JSON serializers, certain Newtonsoft.Json configurations) omit empty arrays and serialize them as `null`. If your tests assert on empty collections, use `.BeNullOrEmpty()` instead of `.BeEmpty()` to avoid false failures.
 
 ### Logic Apps Standard (Unit Testing)
 
@@ -228,10 +287,39 @@ public async Task SendMessage_WhenServiceFails_RetriesThreeTimes()
 <PackageReference Include="coverlet.msbuild" Version="6.0.0" />
 ```
 
-**Usage:**
+**Local Usage:**
 ```bash
 dotnet test --collect:"XPlat Code Coverage"
 ```
+
+**Azure DevOps Pipeline Usage:**
+
+> **Warning:** Do NOT use `--collect:"XPlat Code Coverage"` in `DotNetCoreCLI@2` task arguments — the quotes get stripped by YAML processing, breaking the command. Use a `.runsettings` file instead:
+
+```xml
+<!-- tests/unit/test.runsettings -->
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat Code Coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>
+```
+
+```yaml
+- task: DotNetCoreCLI@2
+  inputs:
+    command: 'test'
+    arguments: '--no-build --no-restore --settings tests/unit/test.runsettings --logger trx'
+    publishTestResults: false
+```
+
+See [pipelines/README.md](../../samples/pipelines/README.md#troubleshooting) for more details.
 
 ### CI/CD Integration
 
