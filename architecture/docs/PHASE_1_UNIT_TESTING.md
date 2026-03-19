@@ -304,12 +304,20 @@ dotnet test --collect:"XPlat Code Coverage"
       <DataCollector friendlyName="XPlat Code Coverage">
         <Configuration>
           <Format>cobertura</Format>
+          <Exclude>[SharedLibrary]*,[*.Views]*</Exclude>
+          <ExcludeByFile>**/obj/**,**/bin/**</ExcludeByFile>
+          <ExcludeByAttribute>ObsoleteAttribute,GeneratedCodeAttribute,CompilerGeneratedAttribute</ExcludeByAttribute>
         </Configuration>
       </DataCollector>
     </DataCollectors>
   </DataCollectionRunSettings>
 </RunSettings>
 ```
+
+> **Coverage Exclusions:** The `.runsettings` file supports several exclusion directives that are **essential** for accurate coverage reporting:
+> - `<Exclude>` — Exclude entire assemblies by name using `[AssemblyName]*` syntax. This is critical when your project uses `<ProjectReference>` to a shared library (see pitfall below).
+> - `<ExcludeByFile>` — Exclude files by path pattern (e.g., auto-generated code in `obj/`).
+> - `<ExcludeByAttribute>` — Exclude code decorated with specific attributes (e.g., `GeneratedCodeAttribute`, `CompilerGeneratedAttribute`).
 
 ```yaml
 - task: DotNetCoreCLI@2
@@ -320,6 +328,19 @@ dotnet test --collect:"XPlat Code Coverage"
 ```
 
 See [pipelines/README.md](../../samples/pipelines/README.md#troubleshooting) for more details.
+
+### InternalsVisibleTo for Testing Internal Helpers
+
+Azure Functions often contain `internal` helper methods (e.g., parsing utilities, formatting helpers) that are not accessible from the test project. To test these without changing their visibility to `public`, add an `<InternalsVisibleTo>` directive to the source project's `.csproj`:
+
+```xml
+<!-- MyFunctionApp.csproj -->
+<ItemGroup>
+    <InternalsVisibleTo Include="MyFunctionApp.UnitTests" />
+</ItemGroup>
+```
+
+This allows the test project to access `internal` members while keeping them hidden from other consumers.
 
 ### CI/CD Integration
 
@@ -532,6 +553,14 @@ public async Task ProcessOrder_WithInvalidAmount_ThrowsException()
 - ❌ Third-party libraries
 - ❌ Framework code
 - ❌ Getters/setters with no logic
+
+> **Watch Out: Hidden Branches in Model Properties**
+>
+> C# model classes can generate more IL-level branches than expected, impacting branch coverage even when they appear to have no logic:
+> - **Nullable value-type wrappers:** Properties like `get => Specified ? _field : null` generate true/false branches in IL.
+> - **XML `ShouldSerialize*()` methods:** Methods like `public bool ShouldSerializeMyProperty() => MyProperty.HasValue;` generate branches for the `HasValue` check.
+>
+> These branches are easy to miss because the source code looks trivial, but they can prevent reaching the 75% branch coverage target. Writing simple tests that set and read these properties (or call ShouldSerialize with and without values) is low-effort and can close branch coverage gaps quickly.
 
 ### Measuring Coverage
 
@@ -1077,6 +1106,9 @@ var mockString = new Mock<string>(); // Don't do this
 | **Hardcoded test data** | Brittle tests | Use builders, randomize data |
 | **Ignoring test failures** | Degraded quality | Zero-tolerance policy |
 | **No test maintenance** | Obsolete tests | Refactor tests with code |
+| **Shared library inflating coverage denominator** | Coverage drops dramatically (e.g., to ~10%) when a shared library is included via `<ProjectReference>` | Add `<Exclude>[LibraryName]*</Exclude>` in `.runsettings` to exclude external assemblies from coverage instrumentation |
+| **`ProjectReference` vs `PackageReference` coverage difference** | Switching a shared library from NuGet package to local project reference causes Coverlet to instrument it, inflating uncovered code | Always update `.runsettings` exclusions when changing a dependency from `<PackageReference>` to `<ProjectReference>` |
+| **Overlooking model property branches** | Branch coverage blocked below target by trivial-looking nullable wrappers and `ShouldSerialize*` methods | Write targeted tests for nullable value-type properties and `ShouldSerialize*()` methods in model classes |
 
 ## Next Steps
 

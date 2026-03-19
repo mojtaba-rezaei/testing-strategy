@@ -473,6 +473,8 @@ graph TD
 | `publishTestResults: true` (default) | Auto-injects `--logger trx` and `--results-directory`, causes duplicates if you also specify them | Set `publishTestResults: false`, use separate `PublishTestResults@2` task |
 | `dotnet test` with private NuGet feeds | Implicit restore only uses nuget.org, fails to find private packages | Add `--no-restore`, run explicit restore step with `vstsFeed` first |
 | Service connection references on feature branches | Azure DevOps validates all service connections at **compile time**, even in stages with runtime `condition:` | Use compile-time `${{ if }}` expressions to exclude deployment stages on branches without variable groups |
+| Shared library via `<ProjectReference>` inflates coverage denominator | Coverage drops dramatically (e.g., to ~10%) because Coverlet instruments all project-referenced assemblies | Add `<Exclude>[LibraryName]*</Exclude>` in `.runsettings` to exclude external assemblies from coverage |
+| Switching `<PackageReference>` to `<ProjectReference>` | Sudden coverage drop when a shared library changes from NuGet to local project reference | Always update `.runsettings` exclusions when changing dependency type |
 
 ### Step 2 — Integration Testing Pipeline
 - **Trigger:** Every PR to test (if possible prod too) environment
@@ -722,6 +724,10 @@ if ($compliant) {
 | **Branch Coverage** | ≥ 75% | ≥ 65% | < 55% |
 | **New Code Coverage** | 100% | ≥ 90% | < 80% (Blocker) |
 
+> **Hidden Branches in Model Classes**
+>
+> C# nullable value-type wrapper properties (e.g., `get => Specified ? _field : null`) and XML serialization `ShouldSerialize*()` methods generate IL-level branches that inflate the total branch count. These appear trivial in source code but can block reaching the 75% branch coverage target. Write simple tests that exercise both paths (value set vs null) for model properties to close these gaps efficiently.
+
 **Coverage Trends:**
 - Report coverage delta on each PR
 - Prevent coverage regression (no decrease > 2%)
@@ -817,6 +823,8 @@ if ($compliant) {
 | Hardcoded test data | Brittle tests | Use test builders, randomize data |
 | Ignoring test failures | Degraded quality | Zero-tolerance policy, investigate immediately |
 | No test maintenance | Obsolete, failing tests | Regular reviews, refactor with production code |
+| Shared library inflating coverage denominator | Coverage drops to ~10% when shared lib is `<ProjectReference>` | Add `<Exclude>[LibraryName]*</Exclude>` in `.runsettings` |
+| Overlooking model property branches | Branch coverage blocked below target | Write tests for nullable wrappers and `ShouldSerialize*()` methods |
 
 ---
 

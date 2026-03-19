@@ -216,12 +216,21 @@ reportgenerator -reports:**/coverage.cobertura.xml -targetdir:coveragereport
       <DataCollector friendlyName="XPlat Code Coverage">
         <Configuration>
           <Format>cobertura</Format>
+          <Exclude>[SharedLibrary]*,[*.Views]*</Exclude>
+          <ExcludeByFile>**/obj/**,**/bin/**</ExcludeByFile>
+          <ExcludeByAttribute>ObsoleteAttribute,GeneratedCodeAttribute,CompilerGeneratedAttribute</ExcludeByAttribute>
         </Configuration>
       </DataCollector>
     </DataCollectors>
   </DataCollectionRunSettings>
 </RunSettings>
 ```
+
+> **Coverage Exclusions:** The `<Exclude>`, `<ExcludeByFile>`, and `<ExcludeByAttribute>` directives are essential for accurate coverage.
+> - Use `<Exclude>[AssemblyName]*</Exclude>` to exclude shared libraries referenced via `<ProjectReference>` (e.g., `[SharedLibrary]*`). Without this, Coverlet instruments the entire referenced assembly, dramatically deflating your coverage percentage.
+> - Use `<ExcludeByFile>` for generated code paths.
+> - Use `<ExcludeByAttribute>` for compiler-generated code.
+> - Replace `SharedLibrary` and `*.Views` with your own assembly names as needed.
 
 2. Reference it in the pipeline:
 ```yaml
@@ -317,6 +326,21 @@ reportgenerator -reports:**/coverage.cobertura.xml -targetdir:coveragereport
 > **Important:** The `${{ if }}` expression must match the same branch conditions as your variable group loading logic. If variable groups load for `dev`, `release/*`, `main`, etc., each deployment stage must be wrapped in a corresponding `${{ if }}` expression.
 
 ### Issue: "Azurite not starting"
+
+### Issue: Coverage drops dramatically after switching to ProjectReference
+**Symptom:** Code coverage suddenly drops from ~80% to ~10% after changing a shared library from `<PackageReference>` (NuGet) to `<ProjectReference>` (local).
+
+**Root Cause:** When a dependency is a `<PackageReference>`, Coverlet does not instrument it — only your project's code is measured. When the same library is referenced via `<ProjectReference>`, Coverlet treats it as part of the build output and instruments all its classes, adding hundreds or thousands of uncovered lines/branches to the denominator.
+
+**Solution:** Add an `<Exclude>` directive in your `.runsettings` file to exclude the shared library assembly:
+```xml
+<Configuration>
+  <Format>cobertura</Format>
+  <Exclude>[SharedLibraryName]*</Exclude>
+</Configuration>
+```
+
+> **Tip:** Always update `.runsettings` exclusions whenever you change a dependency from `<PackageReference>` to `<ProjectReference>` or vice versa.
 **Solution:** Ensure Docker service is available:
 ```yaml
 services:
