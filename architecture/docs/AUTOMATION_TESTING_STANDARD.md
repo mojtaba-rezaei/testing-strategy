@@ -12,7 +12,7 @@ This file is the single source of truth for automation testing standards across 
   - Unit tests for all custom code (Azure Functions, Logic App inline code, helpers, utilities, transformers, validators)
   - Fast, isolated, deterministic tests (< 100ms per test)
   - No external dependencies (mocks/stubs only)
-  - Minimum code coverage: 80% for business logic
+  - Minimum code coverage: ≥80% for all code, ≥90% for business logic (mandatory, enforced in CI/CD)
   - Edge cases, error handling, and validation logic must be covered
 - **Intentionally Deferred:**
   - Integration, contract, performance, and system tests
@@ -161,7 +161,7 @@ Integration tests and E2E tests will be done manually.
 - Focus: Establish unit testing culture
 - Target: 60% of all tests are unit tests
 - Duration: 2-3 months
-- Exit Criteria: Stable unit test suite, 80% code coverage
+- Exit Criteria: Stable unit test suite, ≥80% code coverage (mandatory minimum)
 
 **Phase 2: Add Integration Layer (30% Integration Tests)**
 E2E tests will be done manually.
@@ -243,7 +243,7 @@ flowchart TD
     START([Code Commit]) --> BUILD[Build Solution]
     BUILD --> UNIT{Unit Tests<br/>60%}
 
-    UNIT -->|Pass| COV{Code Coverage<br/>≥ 80%?}
+    UNIT -->|Pass| COV{Code Coverage<br/>≥ 80%?<br/>Mandatory}
     UNIT -->|Fail| FAIL1[❌ Block PR/Deploy]
 
     COV -->|Yes| DEV[Deploy to Dev Env]
@@ -732,8 +732,10 @@ if ($compliant) {
 |--------|--------|-------------------|-------------------|
 | **Overall Code Coverage** | ≥ 80% | ≥ 70% | < 60% (Blocker) |
 | **Business Logic Coverage** | ≥ 90% | ≥ 80% | < 70% (Blocker) |
-| **Branch Coverage** | ≥ 75% | ≥ 65% | < 55% |
+| **Branch Coverage** | ≥ 75% | ≥ 65% | < 55% (Blocker) |
 | **New Code Coverage** | 100% | ≥ 90% | < 80% (Blocker) |
+
+> **These are mandatory minimums, not aspirational targets.** Coverage MUST always be at or above the minimum acceptable thresholds. Falling below the "Minimum Acceptable" column blocks PRs and deployments.
 
 > **Hidden Branches in Model Classes**
 >

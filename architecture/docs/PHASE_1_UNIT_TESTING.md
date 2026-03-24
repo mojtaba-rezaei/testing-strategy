@@ -535,6 +535,8 @@ public async Task ProcessOrder_WithInvalidAmount_ThrowsException()
 | **Branch Coverage** | ≥ 75% | ≥ 65% | < 55% |
 | **New Code Coverage** | 100% | ≥ 90% | < 80% |
 
+> **These are mandatory minimums, not aspirational targets.** Coverage MUST always be at or above the minimum acceptable thresholds. Builds and PRs MUST fail if coverage drops below these floors.
+
 ### What to Cover
 
 **High Priority (Must Cover):**

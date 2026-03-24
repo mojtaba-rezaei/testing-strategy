@@ -128,7 +128,7 @@ This testing strategy defines a **phased, incremental approach** to automation t
    - Get deterministic, standards-compliant unit tests with verified passing status
 
 6. **Achieve Phase 1 compliance:**
-   - 80% code coverage (90%+ for business logic)
+   - ≥80% code coverage (mandatory minimum, ≥90% for business logic)
    - All tests passing in CI
    - Follow naming conventions
    - All testable components covered
@@ -172,7 +172,7 @@ This repository includes comprehensive AI agent instructions for generating stan
 - ✅ AAA pattern (Arrange-Act-Assert)
 - ✅ Proper mocking (Moq) and assertions (FluentAssertions)
 - ✅ Test Builder pattern
-- ✅ >80% coverage (>90% for business logic) with gap analysis
+- ✅ ≥80% coverage (≥90% for business logic) — mandatory minimums, enforced
 - ✅ CI/CD compatible tests
 - ✅ CSV-driven field-level assertions for mapper/converter classes
 - ✅ ALL testable components covered (comprehensive scan)
@@ -193,7 +193,7 @@ This standard applies to all projects using:
 
 | Aspect | Standard |
 |--------|----------|
-| **Unit Test Coverage** | ≥ 80% per class, ≥ 90% for business logic |
+| **Unit Test Coverage** | ≥ 80% per class (mandatory), ≥ 90% for business logic (mandatory) |
 | **Test Execution Time** | Unit: < 5 min, Integration: < 15 min |
 | **Folder Structure** | `/tests/unit`, `/tests/integration`, `/tests/shared` |
 | **Naming Convention** | `<Component>.UnitTests`, `<Component>.IntegrationTests` |

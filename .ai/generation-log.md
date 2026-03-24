@@ -76,7 +76,7 @@ This file tracks all AI-generated content, modifications, and updates to the tes
    - **Subagent Delegation Strategy** — Rules for delegating codebase exploration and test generation to subagents when workload involves 3+ classes
    - **Build & Test Verification** — Mandatory final step: `dotnet restore`, `dotnet build`, `dotnet test` must all pass before task completion
    - **Existing Test Filling** — When tests exist as stubs or contain TODO comments, fill them with real logic using CSV specs and source code analysis
-   - **Coverage Maximization** — Target >80% per class, >90% for business logic; add targeted tests to close coverage gaps
+   - **Coverage Enforcement** — Mandatory minimums: ≥80% per class, ≥90% for business logic; add targeted tests until thresholds are met (not aspirational targets)
 
 2. **Restructured Generation Workflow (Section 8):**
    - Expanded from 7 steps to 10 steps (Steps 0-9)

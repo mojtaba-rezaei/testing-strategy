@@ -230,13 +230,13 @@ Use this checklist to track Phase 1 compliance:
 - [ ] CI pipeline configured and running tests
 - [ ] Code coverage reporting enabled
 - [ ] All tests passing in CI
-- [ ] Coverage ≥ 80% (or path to get there documented)
+- [ ] Coverage ≥ 80% (mandatory minimum, enforced in CI)
 
 ## Next Steps
 
 ### To Continue with Phase 1:
 1. Add tests for all new code you write
-2. Target 80% code coverage for critical components
+2. Enforce ≥80% code coverage for all components (mandatory minimum)
 3. Review [AUTOMATION_TESTING_STANDARD.md](architecture/docs/AUTOMATION_TESTING_STANDARD.md) Section 6 for Definition of Done
 4. Use test builders from Section 8.3 for complex test data
 
@@ -255,7 +255,7 @@ Use this checklist to track Phase 1 compliance:
 
 ### Low code coverage
 - Focus on business logic first
-- Don't worry about hitting 80% immediately
+- Coverage must always be ≥80% — add tests incrementally with each PR to meet this requirement
 - Incrementally improve with each PR
 
 ### Slow tests

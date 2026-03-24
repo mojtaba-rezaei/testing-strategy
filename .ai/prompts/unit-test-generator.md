@@ -6,7 +6,7 @@ This document provides comprehensive instructions for AI agents (ChatGPT, GitHub
 
 **Target Audience:** AI agents tasked with generating unit tests for .NET 8 Azure Functions, Logic Apps dependencies, and integration components.
 
-**Expected Outcome:** Production-ready xUnit test classes that follow naming conventions, use Test Builder pattern, achieve >80% code coverage, and integrate seamlessly with CI/CD pipelines.
+**Expected Outcome:** Production-ready xUnit test classes that follow naming conventions, use Test Builder pattern, enforce mandatory code coverage thresholds (≥80% line/branch coverage per class, ≥90% for business logic), and integrate seamlessly with CI/CD pipelines.
 
 ---
 
@@ -66,6 +66,26 @@ This document provides comprehensive instructions for AI agents (ChatGPT, GitHub
 3. If the user provides a bad example, generate a dedicated error/validation test for it
 4. If the user chooses to proceed without examples, continue normally but add a comment: `// TODO: Replace with real example data for more precise assertions`
 5. Never skip this prompt — even if CSV specs are available, examples add value on top of specs
+
+### Enforce Coverage Thresholds — No Exceptions
+
+**This is a BLOCKING rule.** Line, branch, and code coverage MUST always be **at or above** the specified minimum percentages. These are **hard requirements**, not aspirational targets. The AI agent MUST NOT mark a task as complete if coverage falls below the mandatory thresholds.
+
+**Mandatory coverage thresholds:**
+
+| Metric | Mandatory Minimum | Business Logic Minimum |
+|--------|-------------------|------------------------|
+| **Line Coverage** | ≥ 80% per class | ≥ 90% per class |
+| **Branch Coverage** | ≥ 75% per class | ≥ 90% per class |
+| **New Code Coverage** | ≥ 90% | 100% |
+
+**Enforcement rules:**
+1. After test generation and verification, run coverage analysis (`dotnet test --collect:"XPlat Code Coverage"`)
+2. If any class falls below the mandatory minimum, generate additional tests until the threshold is met
+3. If coverage cannot be raised above the threshold (e.g., untestable generated code), document the specific exclusion and get user approval
+4. NEVER accept "close enough" — 79% is a failure, 80% is the floor
+5. Coverage thresholds apply to every PR and every test run — they are CI/CD gates, not suggestions
+6. Report per-class coverage numbers in the test generation summary
 
 ### Clean Up After Yourself
 
@@ -389,7 +409,7 @@ public class OrderService : IOrderService
 - Scope: Services, models, validators, helpers, utilities
 - Mocking: All external dependencies
 - Performance: <100ms per test
-- Coverage target: >80% per class
+- Coverage: ≥80% per class (mandatory minimum, not a target)
 
 **What NOT to test in unit tests:**
 - ❌ Actual Azure services (Service Bus, Cosmos DB, Key Vault)
@@ -705,9 +725,13 @@ mockResponse.Setup(r => r.Value).Returns(new SecretBundle { Value = "secret-valu
 
 ## 6. Code Coverage Requirements
 
-### 6.1 Coverage Targets
+### 6.1 Coverage Thresholds (Mandatory Minimums)
 
-**Per-Class Minimum:** 80% line coverage
+**This is a BLOCKING rule.** Coverage thresholds are **mandatory minimums**, not targets. Tests MUST NOT be considered complete until these thresholds are met.
+
+**Per-Class Mandatory Minimum:** ≥80% line coverage, ≥75% branch coverage
+
+**Business Logic Mandatory Minimum:** ≥90% line coverage, ≥90% branch coverage
 
 **What to cover:**
 - ✅ All public methods
@@ -779,8 +803,10 @@ dotnet test --collect:"XPlat Code Coverage"
 
 **Verification command (AI agents can suggest this to users):**
 ```bash
-dotnet test /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura /p:Threshold=80
+dotnet test /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura /p:Threshold=80 /p:ThresholdType=line /p:ThresholdStat=total
 ```
+
+**IMPORTANT:** The `/p:Threshold=80` flag will **fail the build** if coverage drops below 80%. This is intentional — coverage thresholds are enforced, not aspirational.
 
 ---
 
@@ -993,8 +1019,8 @@ After generating initial tests, evaluate coverage:
   2. Ensure each branch has at least one test
   3. Add boundary value tests where applicable
   4. Add tests for exception handlers and catch blocks
-  5. Target: >80% per class, strive for >90% on business logic
-  6. If coverage is estimated below 80%, add additional tests:
+  5. Mandatory minimum: ≥80% per class, ≥90% for business logic — these are hard requirements, not targets
+  6. If coverage is below 80% (or below 90% for business logic), add additional tests until the threshold is met:
      → Identify uncovered lines/branches
      → Generate targeted tests for each gap
      → ASK the user if the expected behavior of uncovered code is unclear
@@ -1041,7 +1067,7 @@ Before finalizing:
   ✓ CancellationToken.None used when required
   ✓ CSV mapping specs consumed for all mapper tests (or user confirmed none exist)
   ✓ Mapping examples requested for all mapper classes (or user chose to skip)
-  ✓ Coverage > 80% estimated (>90% for business logic)
+  ✓ Coverage ≥ 80% verified (≥90% for business logic) — mandatory minimums, not estimates
   ✓ All tests compile and pass (`dotnet test` succeeds)
   ✓ No guessed behavior — all unclear items were asked about
   ✓ All test artifacts cleaned up (TestResults/, coverage reports, *.trx files)
@@ -1067,7 +1093,7 @@ REQUIREMENTS:
 2. Test project name: {sourceProjectName}.UnitTests
 3. Use existing builders from: tests/unit/{projectName}.UnitTests/Builders/
 4. Follow naming: MethodName_Scenario_ExpectedBehavior
-5. Target coverage: >80% per class, >90% for business logic
+5. Mandatory coverage minimums: ≥80% per class, ≥90% for business logic (enforced, not aspirational)
 6. Use xUnit, Moq, FluentAssertions
 7. Mock all dependencies
 8. For mappers: use CSV mapping specs for field-level assertions
@@ -1179,11 +1205,14 @@ Before finalizing generated tests, verify:
 - [ ] No flaky tests (deterministic outcomes)
 
 ### 9.7 Coverage Metrics
-- [ ] Estimated line coverage >80% per class (>90% for business logic)
+- [ ] Line coverage ≥80% per class verified (mandatory minimum, not estimated)
+- [ ] Line coverage ≥90% for business logic classes verified (mandatory minimum)
+- [ ] Branch coverage ≥75% per class verified (mandatory minimum)
 - [ ] All branches covered
 - [ ] Exception handlers tested
 - [ ] Return value validations included
-- [ ] Additional tests added where coverage falls below threshold
+- [ ] Additional tests added until coverage meets mandatory thresholds
+- [ ] Coverage report generated and per-class numbers documented
 
 ### 9.8 Build & Test Verification
 - [ ] `dotnet restore` succeeds
@@ -1516,7 +1545,7 @@ public class OrderTests
 This guide provides deterministic, comprehensive instructions for AI agents to generate production-ready unit tests. By following these rules, any AI assistant can generate tests that:
 
 ✅ Follow naming conventions  
-✅ Achieve >80% code coverage (>90% for business logic)  
+✅ Enforce mandatory coverage minimums: ≥80% line/branch per class, ≥90% for business logic  
 ✅ Use Test Builder pattern  
 ✅ Integrate with CI/CD pipelines  
 ✅ Align with 60-30-10 test pyramid  
