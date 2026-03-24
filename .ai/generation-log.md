@@ -102,6 +102,46 @@ This file tracks all AI-generated content, modifications, and updates to the tes
 
 ---
 
+### March 24, 2026 - Mapping Examples & Cleanup Rules
+
+**AI Model:** Claude Opus 4.6 (via GitHub Copilot)  
+**Modified by:** GitHub Copilot Agent
+
+**Changes Made:**
+
+1. **Added new core principle — "ALWAYS Ask for Mapping Examples":**
+   - AI agents must ask the user for example input/output data (good or bad) for **each** mapper/converter class before generating tests
+   - Good examples are used as primary test data in SampleData.cs with precise assertions
+   - Bad examples generate dedicated error/validation tests
+   - Users are given the explicit choice to proceed without examples
+   - This is a separate, additional prompt on top of CSV mapping spec discovery
+
+2. **Added new core principle — "Clean Up After Yourself":**
+   - AI agents must remove all generated test artifacts after verification completes
+   - Cleanup targets: TestResults/, coverage reports, *.trx files, coveragereport/, bin/, obj/
+   - Verify .gitignore includes test artifact patterns
+   - Cleanup failures warn but do not block task completion
+
+3. **Updated Generation Workflow (Section 8.1):**
+   - Added Step 1b: Ask for Mapping Examples (BLOCKING for mappers)
+   - Added Step 9: Clean Up Test Artifacts (MANDATORY)
+   - Renumbered Self-Review Checklist to Step 10
+   - Added mapping examples and cleanup items to Self-Review Checklist
+
+4. **Expanded Validation Checklist (Section 9):**
+   - Section 9.2: Added example-asking verification items (good/bad examples, TODO comments)
+   - Added Section 9.9: Cleanup (test results, coverage, build outputs, .gitignore)
+   - Renumbered Information Integrity to 9.10
+
+5. **Updated Automated Generation Template (Section 8.2):**
+   - Added MAPPING EXAMPLES parameter
+   - Added requirement to ask for examples per mapper
+   - Added requirement to clean up test artifacts after completion
+
+6. **Updated related documentation:**
+   - Co-Testing MCP README.md — Added mapping examples prompt and cleanup guidance
+   - generation-log.md — This entry
+
 ## Modification Guidelines
 
 When AI generates or modifies content:
