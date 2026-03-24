@@ -62,6 +62,46 @@ This file tracks all AI-generated content, modifications, and updates to the tes
 
 ---
 
+### March 24, 2026 - Unit Test Generator Enhancement
+
+**AI Model:** Claude Opus 4.6 (via GitHub Copilot)  
+**Modified by:** GitHub Copilot Agent
+
+**Changes Made:**
+
+1. **Enhanced unit-test-generator.md with new core capabilities:**
+   - **Always Ask, Never Guess policy** — AI agents must ask for clarification instead of guessing when behavior, context, or specifications are unclear
+   - **CSV Mapping Specification Discovery** — Blocking step for mapper/converter classes; agents must locate CSV mapping spec files or prompt the user to provide them before generating mapper tests
+   - **Comprehensive Component Discovery** — Agents must scan ALL testable components in the Function App (not just the class the user points to) and generate tests for every eligible class
+   - **Subagent Delegation Strategy** — Rules for delegating codebase exploration and test generation to subagents when workload involves 3+ classes
+   - **Build & Test Verification** — Mandatory final step: `dotnet restore`, `dotnet build`, `dotnet test` must all pass before task completion
+   - **Existing Test Filling** — When tests exist as stubs or contain TODO comments, fill them with real logic using CSV specs and source code analysis
+   - **Coverage Maximization** — Target >80% per class, >90% for business logic; add targeted tests to close coverage gaps
+
+2. **Restructured Generation Workflow (Section 8):**
+   - Expanded from 7 steps to 10 steps (Steps 0-9)
+   - Added Step 0: Comprehensive component discovery
+   - Added Step 1: CSV mapping spec discovery (blocking)
+   - Added Step 7: Coverage maximization
+   - Added Step 8: Build & test verification
+   - Added Step 9: Enhanced self-review checklist
+   - Added Section 8.3: Subagent delegation strategy
+
+3. **Expanded Validation Checklist (Section 9):**
+   - Added 9.1: Component Completeness
+   - Added 9.2: CSV Mapping Specification
+   - Added 9.8: Build & Test Verification
+   - Added 9.9: Information Integrity (no guessing audit)
+
+4. **Updated related documentation:**
+   - README.md — Updated Key Principles, Getting Started, AI section, standards table
+   - .ai/README.md — Added new principles and expanded AI Agent guidance
+   - generation-log.md — This entry
+
+**Manual Modifications:** None (AI-generated update)
+
+---
+
 ## Modification Guidelines
 
 When AI generates or modifies content:
@@ -83,6 +123,6 @@ To regenerate content using AI:
 
 ---
 
-**Current Documentation Version:** 2.0  
-**Last AI Update:** February 16, 2026  
-**Next Scheduled Review:** May 16, 2026
+**Current Documentation Version:** 3.0  
+**Last AI Update:** March 24, 2026  
+**Next Scheduled Review:** June 24, 2026

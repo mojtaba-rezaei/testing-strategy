@@ -13,6 +13,9 @@ This testing strategy defines a **phased, incremental approach** to automation t
 - **Azure-Centric:** Tailored for Azure Integration Platform (Logic Apps, Functions, Service Bus, etc.)
 - **Quality Gates:** Enforced standards prevent quality degradation
 - **Developer-Friendly:** Focus on fast feedback and easy adoption
+- **Always Ask, Never Guess:** AI agents must ask for clarification when behavior is unclear
+- **Comprehensive Coverage:** All testable components in the Function App must have unit tests
+- **CSV-Driven Precision:** Mapper/converter tests use CSV mapping specifications for field-level assertions
 
 ## Documentation Structure
 
@@ -112,15 +115,23 @@ This testing strategy defines a **phased, incremental approach** to automation t
    - **For Azure DevOps:** Copy [samples/pipelines/azure-pipelines-unit-tests.yml](samples/pipelines/azure-pipelines-unit-tests.yml)
    - Configure secrets and variables as per README files
 
-4. **Generate tests with AI:**
+4. **Gather CSV mapping specifications (if applicable):**
+   - If your project contains mappers/converters, locate CSV mapping spec files
+   - These define source-to-target field mappings for precise test assertions
+   - Place them in a `mapping-spec/` folder or provide paths to the AI agent
+
+5. **Generate tests with AI:**
    - Use [.ai/prompts/unit-test-generator.md](.ai/prompts/unit-test-generator.md) with your AI assistant
    - Provide the prompt to ChatGPT, GitHub Copilot, or Claude
-   - Get deterministic, standards-compliant unit tests
+   - The AI agent will scan ALL testable components (not just what you point to)
+   - It will ask for CSV mapping specs and clarifications — don't skip these prompts
+   - Get deterministic, standards-compliant unit tests with verified passing status
 
-5. **Achieve Phase 1 compliance:**
-   - 80% code coverage
+6. **Achieve Phase 1 compliance:**
+   - 80% code coverage (90%+ for business logic)
    - All tests passing in CI
    - Follow naming conventions
+   - All testable components covered
 
 ### For Existing Projects
 
@@ -145,22 +156,28 @@ This testing strategy defines a **phased, incremental approach** to automation t
 
 ### Using AI to Generate Tests
 
-**🤖 NEW: AI-Powered Test Generation**
+**🤖 AI-Powered Test Generation**
 
 This repository includes comprehensive AI agent instructions for generating standards-compliant unit tests:
 
 1. **Open your AI assistant** (ChatGPT, GitHub Copilot Chat, Claude)
 2. **Load the prompt:** Copy content from [.ai/prompts/unit-test-generator.md](.ai/prompts/unit-test-generator.md)
-3. **Provide your source code:** Paste the class you want to test
-4. **Get production-ready tests:** The AI will generate full test classes following all conventions
+3. **Point to your project root:** The AI will automatically scan ALL testable components
+4. **Provide CSV mapping specs** (if applicable): The AI will ask for these — they enable precise field-level mapper tests
+5. **Answer clarification questions:** The AI will ask about unclear behavior instead of guessing
+6. **Get production-ready tests:** The AI generates, builds, and verifies all tests pass
 
 **What you get:**
 - ✅ Correct naming (MethodName_Scenario_ExpectedBehavior)
 - ✅ AAA pattern (Arrange-Act-Assert)
 - ✅ Proper mocking (Moq) and assertions (FluentAssertions)
 - ✅ Test Builder pattern
-- ✅ >80% coverage guidance
+- ✅ >80% coverage (>90% for business logic) with gap analysis
 - ✅ CI/CD compatible tests
+- ✅ CSV-driven field-level assertions for mapper/converter classes
+- ✅ ALL testable components covered (comprehensive scan)
+- ✅ Existing stubbed/TODO tests filled with real logic
+- ✅ Build and test verified before completion
 
 See [.ai/README.md](.ai/README.md) for more details.
 
@@ -176,7 +193,7 @@ This standard applies to all projects using:
 
 | Aspect | Standard |
 |--------|----------|
-| **Unit Test Coverage** | ≥ 80% for business logic |
+| **Unit Test Coverage** | ≥ 80% per class, ≥ 90% for business logic |
 | **Test Execution Time** | Unit: < 5 min, Integration: < 15 min |
 | **Folder Structure** | `/tests/unit`, `/tests/integration`, `/tests/shared` |
 | **Naming Convention** | `<Component>.UnitTests`, `<Component>.IntegrationTests` |

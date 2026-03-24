@@ -10,6 +10,47 @@ This document provides comprehensive instructions for AI agents (ChatGPT, GitHub
 
 ---
 
+## Core Principles
+
+### ALWAYS Ask — NEVER Guess
+
+**This is a BLOCKING rule.** When generating tests, the AI agent MUST ask the user for clarification instead of guessing whenever:
+
+- **Missing context:** The purpose of a parameter, return type, or business rule is unclear
+- **Ambiguous behavior:** A method could be interpreted in multiple ways
+- **Missing CSV mapping specifications:** If mapper/converter functions exist but no CSV mapping spec files are provided (see [Section 1.4](#14-csv-mapping-specification-discovery))
+- **Missing source code:** A referenced interface, model, or dependency cannot be found in the workspace
+- **Unknown conventions:** The project uses patterns or naming not covered by this document
+- **Coverage gaps:** It is unclear which components need tests vs. which are intentionally excluded
+
+**Examples of asking vs. guessing:**
+
+| Situation | ❌ Guessing (WRONG) | ✅ Asking (CORRECT) |
+|-----------|---------------------|---------------------|
+| Unknown return type meaning | Assume `ProcessResult.Data` is a string | "What type does `ProcessResult.Data` contain? I see it used in line X but can't infer the expected values." |
+| Missing CSV mapping spec | Generate generic assertion `result.Should().NotBeNull()` | "Do you have CSV mapping specification files for the `OrderMapper`? These define source-to-target field mappings and enable precise test assertions." |
+| Unclear validation rule | Invent a regex pattern | "What validation rules apply to `OrderId`? I see it's checked but the expected format isn't clear from the code." |
+| Unknown dependency behavior | Mock to return null | "What should `IExternalService.GetDataAsync` return when called with an invalid ID? Should it return null, throw, or return an empty result?" |
+
+### Use Subagents for Heavy Workloads
+
+When the task involves multiple components or the workload is substantial, **delegate to subagents** to parallelize and maintain quality:
+
+| Scenario | Subagent Usage |
+|----------|----------------|
+| Scanning the full codebase to identify all testable components | Use an **Explore** subagent for codebase scanning |
+| Generating tests for 5+ classes simultaneously | Delegate each class or folder to a separate subagent |
+| Researching existing test patterns in the project | Use an **Explore** subagent to gather patterns |
+| Validating all generated tests compile and pass | Run build/test commands sequentially after generation |
+
+**Subagent delegation rules:**
+1. Use subagents for **read-only exploration** (finding components, reading files, identifying patterns)
+2. Use subagents when generating tests for **3 or more classes** to parallelize analysis
+3. Always **consolidate subagent results** before writing any files
+4. The main agent retains responsibility for **final validation** (build + test pass)
+
+---
+
 ## Table of Contents
 
 1. [Codebase Understanding](#codebase-understanding)
@@ -87,7 +128,149 @@ Before generating tests, analyze the codebase structure:
 - `Microsoft.Azure.Functions.Worker` (for function testing)
 - `Microsoft.Extensions.Logging.Abstractions` (for ILogger mocking)
 
-### 1.3 Dependency Graph Analysis
+### 1.3 Comprehensive Component Discovery
+
+**CRITICAL RULE:** Every testable component in the Function App MUST have unit tests. Do not generate tests for only the class the user points to — scan the entire `src/` tree and ensure full coverage.
+
+**Step 1: Scan all source folders**
+
+Use a subagent (Explore) to identify ALL classes in:
+- `Functions/` — HTTP/Timer/Queue-triggered function classes
+- `Services/` — Business logic services
+- `Models/` — Domain models with logic (e.g., `IsValid()` methods)
+- `Validators/` — Validation classes
+- `Mappers/` or `Converters/` — Data transformation classes
+- `Helpers/` or `Utilities/` — Shared utility classes
+- `Infrastructure/` — Repository or client wrapper classes
+
+**Step 2: Determine test eligibility**
+
+For each discovered class, classify:
+
+| Class Type | Testable? | Test Category |
+|------------|-----------|---------------|
+| Services with business logic | ✅ Yes | Full test suite (happy/error/edge) |
+| Functions (HTTP/Timer triggers) | ✅ Yes | Mock dependencies, test orchestration |
+| Models with methods (IsValid, etc.) | ✅ Yes | Unit tests for all logic methods |
+| Validators | ✅ Yes | All validation rules + boundary cases |
+| Mappers/Converters | ✅ Yes | Field-level mapping assertions (use CSV specs!) |
+| Static helpers/utilities | ✅ Yes | Input/output testing |
+| DTOs/POCOs (no logic) | ❌ No | Skip — auto-properties only |
+| `Program.cs` / DI registration | ❌ No | Skip — integration test scope |
+| Interfaces | ❌ No | Skip — no implementation to test |
+
+**Step 3: Report findings to the user**
+
+Before generating tests, present a summary:
+```
+I found the following testable components:
+  - Functions/: ProcessOrderFunction.cs (1 class)
+  - Services/: OrderService.cs, ValidationService.cs (2 classes)
+  - Models/: Order.cs (1 class with IsValid() method)
+  - Mappers/: OrderMapper.cs (1 class — CSV mapping spec needed)
+
+Components without tests yet: [list]
+Components with existing tests: [list]
+
+Shall I proceed with generating tests for all components, or do you want to focus on specific ones?
+```
+
+### 1.4 CSV Mapping Specification Discovery
+
+**BLOCKING STEP for Mappers/Converters:** If the codebase contains mapper or converter classes, you MUST check for CSV mapping specification files before generating tests.
+
+CSV mapping specifications define source-to-target field mappings and enable **precise, field-level test assertions** instead of generic `result.Should().NotBeNull()` checks.
+
+**Where to look for CSV specs:**
+1. A `mapping-spec/` or `mappings/` folder at the repo root or near `src/`
+2. A `docs/mappings/` folder
+3. Files named `*-mapping.csv`, `*-spec.csv`, or `*-fields.csv` anywhere in the repo
+4. Ask the user directly
+
+**CSV Spec Format (expected):**
+```csv
+SourceField,SourceType,TargetField,TargetType,Required,DefaultValue,TransformRule
+order_id,string,OrderId,string,true,,direct
+customer_name,string,CustomerName,string,true,,direct
+order_amount,decimal,Amount,decimal,true,0.00,direct
+order_date,string,OrderDate,DateTime,true,,parse:yyyy-MM-dd
+status_code,int,Status,string,false,"Pending",lookup:StatusMap
+```
+
+**MANDATORY prompt when CSV specs are missing:**
+
+> "I found mapper/converter classes that would benefit from CSV mapping specification files. These specs define source-to-target field mappings and enable accurate, field-level test assertions.
+>
+> Do you have CSV mapping specification files for this project? You can provide:
+> - A single CSV file path
+> - Multiple paths separated by semicolons
+> - A folder containing .csv files
+>
+> Without CSV specs, I'll generate basic structural tests. With CSV specs, I'll generate precise field-level assertions that verify each mapping rule."
+
+**When CSV specs ARE available — test generation rules:**
+
+For each row in the CSV mapping spec, generate assertions like:
+```csharp
+[Fact]
+public void Map_WhenSourceHasOrderId_ShouldMapToTargetOrderId()
+{
+    // Arrange
+    var source = new SourceOrder { order_id = "ORD-123" };
+
+    // Act
+    var result = sut.Map(source);
+
+    // Assert
+    result.OrderId.Should().Be("ORD-123");
+}
+
+[Fact]
+public void Map_WhenSourceHasOrderDate_ShouldParseToDateTime()
+{
+    // Arrange
+    var source = new SourceOrder { order_date = "2026-01-15" };
+
+    // Act
+    var result = sut.Map(source);
+
+    // Assert
+    result.OrderDate.Should().Be(new DateTime(2026, 1, 15));
+}
+
+[Fact]
+public void Map_WhenStatusCodeHasLookupValue_ShouldMapViaStatusMap()
+{
+    // Arrange
+    var source = new SourceOrder { status_code = 1 };
+
+    // Act
+    var result = sut.Map(source);
+
+    // Assert
+    result.Status.Should().Be("Active"); // Based on StatusMap lookup
+}
+
+[Fact]
+public void Map_WhenOptionalFieldIsMissing_ShouldUseDefaultValue()
+{
+    // Arrange — status_code not set (default)
+    var source = new SourceOrder();
+
+    // Act
+    var result = sut.Map(source);
+
+    // Assert
+    result.Status.Should().Be("Pending"); // Default from CSV spec
+}
+```
+
+**When CSV specs are NOT available (user confirms):**
+- Generate structural tests only (method exists, doesn't throw, returns non-null)
+- Add `// TODO: Add field-level assertions when CSV mapping spec is available` comments
+- Log a warning in the test generation summary
+
+### 1.5 Dependency Graph Analysis
 
 **For each class under test:**
 1. Identify constructor dependencies (interfaces to mock)
@@ -634,43 +817,69 @@ jobs:
 
 ### 8.1 Step-by-Step Process
 
-**Step 1: Analyze Target Class**
+**Step 0: Discover ALL Testable Components (MANDATORY FIRST STEP)**
 ```
-Input: Path to source code file (e.g., src/Services/OrderService.cs)
 Actions:
-  1. Read file content
+  1. Use an Explore subagent to scan the entire src/ tree
+  2. Identify ALL classes in Functions/, Services/, Models/, Mappers/,
+     Validators/, Helpers/, Infrastructure/ folders
+  3. Classify each class as testable or not (see Section 1.3)
+  4. Check for existing test files in tests/unit/
+  5. Identify components WITHOUT tests (these are gaps to fill)
+  6. Present findings to the user and ask for confirmation before proceeding
+  7. If the workload involves 3+ classes, plan subagent delegation
+```
+
+**Step 1: Check for CSV Mapping Specifications (BLOCKING for Mappers)**
+```
+Actions:
+  1. Search for CSV mapping spec files in the repo (see Section 1.4)
+  2. If mapper/converter classes exist but NO CSV specs are found:
+     → STOP and ask the user to provide them
+     → Only proceed without CSV specs if user explicitly confirms they don't have them
+  3. If CSV specs are found, parse them to extract field mappings
+  4. Match each CSV spec to its corresponding mapper class
+```
+
+**Step 2: Analyze Target Classes**
+```
+Input: All testable classes identified in Step 0
+Actions:
+  1. Read each file's content
   2. Identify class name, namespace, constructor dependencies
   3. Extract all public methods with signatures
   4. Note return types, parameters, async/sync patterns
+  5. For mappers: load corresponding CSV spec field mappings
+  6. ASK the user if any method's purpose or expected behavior is unclear
 ```
 
-**Step 2: Check for Existing Builders**
+**Step 3: Check for Existing Tests & Builders**
 ```
-Input: tests/unit/<Project>.UnitTests/Builders/
+Input: tests/unit/<Project>.UnitTests/
 Actions:
-  1. Search for existing builders (e.g., OrderBuilder.cs)
-  2. If found, use them in generated tests
-  3. If missing, generate new builder for complex models
+  1. Search for existing test files — identify gaps vs. what already exists
+  2. Search for existing builders (e.g., OrderBuilder.cs) — reuse them
+  3. If builders are missing for complex models, generate new ones
+  4. If tests already exist but are incomplete (stubbed / TODO comments):
+     → Fill in the test logic using CSV mapping specs and source code analysis
+     → Do NOT delete or overwrite working tests
 ```
 
-**Step 3: Generate Test Class Skeleton**
+**Step 4: Generate / Fill Test Methods**
 ```
-Output file: tests/unit/<Project>.UnitTests/<Folder>/<ClassName>Tests.cs
-Content:
-  - Namespace matching source + .UnitTests
-  - Using statements (xUnit, Moq, FluentAssertions, Builders)
-  - Class declaration: public class <ClassName>Tests
-  - Mock fields if shared across tests
-```
-
-**Step 4: Generate Test Methods**
-```
-For each public method in source class:
+For each public method in each source class:
   1. Happy path test (valid inputs, expected success)
   2. Null/invalid input tests (ArgumentNullException, ArgumentException)
   3. Dependency failure tests (when mocked service throws)
   4. Business logic branches (if/else paths)
   5. Edge cases (empty collections, boundary values)
+  6. For mappers WITH CSV specs:
+     → Field-level mapping assertions for EACH row in the CSV
+     → Transform rule validation (parse, lookup, direct copy)
+     → Default value assertions for optional fields
+     → Required field validation tests
+  7. For mappers WITHOUT CSV specs (user confirmed none available):
+     → Structural tests only + TODO comments for field-level assertions
 ```
 
 **Step 5: Add FluentAssertions**
@@ -688,16 +897,50 @@ Add verification for critical dependencies:
   mockService.Verify(x => x.MethodName(It.IsAny<Type>()), Times.Once);
 ```
 
-**Step 7: Self-Review Checklist**
+**Step 7: Maximize Code Coverage**
+```
+After generating initial tests, evaluate coverage:
+  1. Count all branches (if/else, switch, ternary, null-coalescing)
+  2. Ensure each branch has at least one test
+  3. Add boundary value tests where applicable
+  4. Add tests for exception handlers and catch blocks
+  5. Target: >80% per class, strive for >90% on business logic
+  6. If coverage is estimated below 80%, add additional tests:
+     → Identify uncovered lines/branches
+     → Generate targeted tests for each gap
+     → ASK the user if the expected behavior of uncovered code is unclear
+```
+
+**Step 8: Build & Test Verification (MANDATORY)**
+```
+After generating/filling all test files:
+  1. Run `dotnet restore` on the test project
+  2. Run `dotnet build` on the test project
+  3. Run `dotnet test` to verify all tests pass
+  4. If build errors occur:
+     → Fix simple issues (missing usings, wrong namespaces, type mismatches)
+     → For complex issues, report to the user with clear fix instructions
+  5. If tests fail:
+     → Analyze the failure output
+     → ASK the user about expected behavior if the failure suggests a misunderstanding
+     → Fix the test if the source code behavior is clear
+  6. ALL tests MUST be passing before marking the task as complete
+```
+
+**Step 9: Self-Review Checklist**
 ```
 Before finalizing:
+  ✓ ALL testable components have test classes (not just the one the user asked about)
   ✓ Naming conventions followed (MethodName_Scenario_ExpectedBehavior)
   ✓ AAA pattern clear (comments included)
   ✓ All dependencies mocked
   ✓ No hardcoded values (use builders or constants)
   ✓ Async tests use await properly
   ✓ CancellationToken.None used when required
-  ✓ Coverage > 80% estimated
+  ✓ CSV mapping specs consumed for all mapper tests (or user confirmed none exist)
+  ✓ Coverage > 80% estimated (>90% for business logic)
+  ✓ All tests compile and pass (`dotnet test` succeeds)
+  ✓ No guessed behavior — all unclear items were asked about
 ```
 
 ### 8.2 Automated Generation Template
@@ -705,25 +948,70 @@ Before finalizing:
 **Prompt for AI agent self-invocation:**
 
 ```
-Generate unit tests for the following class:
+Generate unit tests for the following project:
 
-SOURCE FILE: {filePath}
-SOURCE CODE:
-```csharp
-{sourceCodeContent}
-```
+PROJECT ROOT: {projectRootPath}
+SOURCE FOLDER: {srcFolderPath}
+EXISTING TESTS FOLDER: {testsFolderPath} (may be empty or partially complete)
+
+CSV MAPPING SPECS: {csvSpecPaths | "NONE — user confirmed" | "NOT YET ASKED — must ask user"}
 
 REQUIREMENTS:
-1. Test project name: {sourceProjectName}.UnitTests
-2. Test class name: {className}Tests
+1. Scan ALL testable components in the source folder (see Section 1.3)
+2. Test project name: {sourceProjectName}.UnitTests
 3. Use existing builders from: tests/unit/{projectName}.UnitTests/Builders/
 4. Follow naming: MethodName_Scenario_ExpectedBehavior
-5. Target coverage: >80%
+5. Target coverage: >80% per class, >90% for business logic
 6. Use xUnit, Moq, FluentAssertions
-7. Mock all dependencies: {listOfDependencies}
+7. Mock all dependencies
+8. For mappers: use CSV mapping specs for field-level assertions
+9. Fill in existing stubbed/TODO tests with real logic
+10. ASK about any unclear behavior — do NOT guess
+11. Verify all tests compile and pass before completing
+
+WORKFLOW:
+- Step 0: Discover all testable components (use Explore subagent)
+- Step 1: Check for CSV mapping specs (BLOCKING for mappers)
+- Step 2-9: Follow Generation Workflow in Section 8.1
 
 OUTPUT:
-- Full test class code ready to save to: tests/unit/{projectName}.UnitTests/{folder}/{className}Tests.cs
+- Test class files for ALL testable components
+- Build verification results
+- Coverage estimation summary
+- List of questions asked to the user (if any)
+```
+
+### 8.3 Subagent Delegation Strategy
+
+When the codebase has many testable components, delegate work to subagents:
+
+```
+Main Agent Responsibilities:
+  - Orchestrate the overall workflow
+  - Ask the user for CSV specs and clarifications
+  - Make final decisions on test structure
+  - Run build and test verification
+  - Consolidate results and report to the user
+
+Explore Subagent Tasks:
+  - Scan src/ for all testable classes
+  - Read existing test files to identify gaps
+  - Search for CSV mapping spec files
+  - Read builder classes to understand existing patterns
+  - Analyze dependency graphs across classes
+
+Generation Subagent Tasks (when 3+ classes need tests):
+  - Generate test classes for assigned components
+  - Each subagent handles one folder (e.g., Services/, Functions/, Models/)
+  - Returns generated test code for main agent to write and validate
+```
+
+**Delegation decision tree:**
+```
+How many testable classes need new/updated tests?
+├─ 1-2 classes → Handle directly (no subagents needed)
+├─ 3-5 classes → Use Explore subagent for analysis, generate directly
+└─ 6+ classes → Use Explore subagent for analysis + delegate generation
 ```
 
 ---
@@ -732,39 +1020,66 @@ OUTPUT:
 
 Before finalizing generated tests, verify:
 
-### 9.1 Functional Requirements
+### 9.1 Component Completeness
+- [ ] ALL testable components in the Function App have been identified
+- [ ] ALL testable components have corresponding test classes
+- [ ] No testable class was skipped without explicit user confirmation
+- [ ] Existing stubbed/TODO tests have been filled with real logic
+
+### 9.2 CSV Mapping Specification
+- [ ] Mapper/converter classes checked for corresponding CSV specs
+- [ ] User was prompted for CSV specs if not found (BLOCKING)
+- [ ] CSV-driven tests include field-level assertions for each mapping row
+- [ ] Transform rules (parse, lookup, direct) are tested individually
+- [ ] Default values for optional fields are tested
+- [ ] Required field validation is tested
+- [ ] If no CSV specs available, user explicitly confirmed and TODO comments added
+
+### 9.3 Functional Requirements
 - [ ] All public methods have at least one test
 - [ ] Happy path covered
 - [ ] Exception paths covered
 - [ ] Null/invalid input handling tested
 - [ ] All if/else branches covered
 
-### 9.2 Code Quality
+### 9.4 Code Quality
 - [ ] Naming follows pattern: `MethodName_Scenario_ExpectedBehavior`
 - [ ] AAA pattern used consistently
 - [ ] No code duplication (use builders/helpers)
 - [ ] FluentAssertions used for readability
 - [ ] Comments explain complex setups
 
-### 9.3 Isolation & Mocking
+### 9.5 Isolation & Mocking
 - [ ] All external dependencies mocked
 - [ ] No real database connections
 - [ ] No real HTTP calls
 - [ ] No real file I/O
 - [ ] ILogger mocked correctly
 
-### 9.4 CI/CD Compatibility
+### 9.6 CI/CD Compatibility
 - [ ] Tests run with `dotnet test` without errors
 - [ ] No environment variable dependencies
 - [ ] No local file path dependencies
 - [ ] Execution time <100ms per test
 - [ ] No flaky tests (deterministic outcomes)
 
-### 9.5 Coverage Metrics
-- [ ] Estimated line coverage >80%
+### 9.7 Coverage Metrics
+- [ ] Estimated line coverage >80% per class (>90% for business logic)
 - [ ] All branches covered
 - [ ] Exception handlers tested
 - [ ] Return value validations included
+- [ ] Additional tests added where coverage falls below threshold
+
+### 9.8 Build & Test Verification
+- [ ] `dotnet restore` succeeds
+- [ ] `dotnet build` succeeds with no errors
+- [ ] `dotnet test` passes — ALL tests green
+- [ ] No test was left in a failing state
+
+### 9.9 Information Integrity
+- [ ] No behavior was guessed — all ambiguities were asked about
+- [ ] All user-provided answers are reflected in tests
+- [ ] Questions log is available for audit
 
 ---
 
@@ -1077,10 +1392,15 @@ public class OrderTests
 This guide provides deterministic, comprehensive instructions for AI agents to generate production-ready unit tests. By following these rules, any AI assistant can generate tests that:
 
 ✅ Follow naming conventions  
-✅ Achieve >80% code coverage  
+✅ Achieve >80% code coverage (>90% for business logic)  
 ✅ Use Test Builder pattern  
 ✅ Integrate with CI/CD pipelines  
 ✅ Align with 60-30-10 test pyramid  
 ✅ Are maintainable and readable  
+✅ Cover ALL testable components in the Function App  
+✅ Use CSV mapping specifications for precise mapper/converter tests  
+✅ Never guess — always ask for clarification  
+✅ Leverage subagents for heavy workloads  
+✅ Verify all tests compile and pass before completing  
 
 **Usage:** Point any AI agent (ChatGPT, Copilot, Claude) to this document before requesting test generation.

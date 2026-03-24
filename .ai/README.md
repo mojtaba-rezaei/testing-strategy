@@ -30,6 +30,11 @@ The `.ai` folder serves as a dedicated space for:
 
 ### For AI Agents
 - **Generate Unit Tests**: Use `unit-test-generator.md` for comprehensive test generation
+  - Scans ALL testable components in the Function App (not just single classes)
+  - Uses CSV mapping specifications for precise mapper/converter test assertions
+  - Asks the user for clarification instead of guessing unclear behavior
+  - Delegates to subagents for heavy workloads (3+ classes)
+  - Verifies tests compile and pass before completing
 - **Evolve Strategy**: Use `testing-strategy-prompt.md` to regenerate or update the strategy
 - **Follow Standards**: All prompts reference the core `AUTOMATION_TESTING_STANDARD.md`
 
@@ -39,6 +44,9 @@ The `.ai` folder serves as a dedicated space for:
 2. **Reusability**: Prompts are designed to be reusable across projects
 3. **Version Control**: Prompts evolve with the testing strategy
 4. **Human Oversight**: AI-generated content must be reviewed by humans before adoption
+5. **Always Ask, Never Guess**: AI agents must ask users for clarification when behavior or context is unclear
+6. **Subagent Delegation**: Heavy workloads are split across subagents for efficiency and quality
+7. **CSV-Driven Precision**: Mapper/converter tests use CSV mapping specifications when available
 
 ## Related Documentation
 
